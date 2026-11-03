@@ -102,6 +102,92 @@ jobs:
       - name: Conformance (JSONTestSuite)
         run: python scripts/run_jsontestsuite.py build/mingw/wjson.exe JSONTestSuite/test_parsing
 
+  package:
+    # Installs the library and builds a separate project with find_package().
+    name: CMake package (MSVC x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build and install
+        run: |
+          cmake --preset msvc-x64 -DWJSON_BUILD_TESTS=OFF
+          cmake --build build/msvc-x64 --config Release --parallel
+          cmake --install build/msvc-x64 --config Release --prefix ${{ github.workspace }}/install
+
+      - name: Build consumer project
+        run: |
+          cmake -S tests/package -B build/package -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+          cmake --build build/package --config Release
+          ctest --test-dir build/package -C Release --output-on-failure
+
+  vcpkg:
+    # Builds the overlay port in ports/wjson with the runner's vcpkg.
+    name: vcpkg port (${{ matrix.triplet }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        triplet: [x64-windows, x64-windows-static]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install port
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT/vcpkg.exe" install "wjson[tool]:${{ matrix.triplet }}" --overlay-ports=ports
+          if ($LASTEXITCODE -ne 0) {
+            Get-ChildItem "$env:VCPKG_INSTALLATION_ROOT/buildtrees/wjson" -Filter *.log -ErrorAction SilentlyContinue |
+              ForEach-Object { "::group::$($_.Name)"; Get-Content $_.FullName; "::endgroup::" }
+            exit 1
+          }
+
+      - name: Build consumer project
+        shell: pwsh
+        run: |
+          cmake -S tests/package -B build/vcpkg-consumer `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          cmake --build build/vcpkg-consumer --config Release
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          ctest --test-dir build/vcpkg-consumer -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Run installed tool
+        shell: pwsh
+        run: |
+          $tool = "$env:VCPKG_INSTALLATION_ROOT/installed/${{ matrix.triplet }}/tools/wjson/wjson.exe"
+          & $tool --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+  benchmark:
+    # Publishes throughput figures in the run summary. Shared CI machines are
+    # noisy, so compare trends rather than single numbers.
+    name: Benchmark (MSVC x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure
+        run: cmake --preset msvc-x64 -DWJSON_BUILD_BENCHMARKS=ON -DWJSON_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build/msvc-x64 --config Release --target wjson_bench --parallel
+
+      - name: Fetch benchmark data
+        run: python scripts/fetch_benchmark_data.py bench-data
+
+      - name: Run benchmark
+        shell: pwsh
+        run: |
+          $table = & build/msvc-x64/Release/wjson_bench.exe --markdown --min-time 2 bench-data/twitter.json bench-data/canada.json bench-data/citm_catalog.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $table | Write-Output
+          "## wjson benchmark (MSVC x64, windows-latest)" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          "" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          $table | Out-File -Append $env:GITHUB_STEP_SUMMARY
+
   linux:
     # Portability check and sanitizers (ASan/UBSan are not yet wired up for MSVC).
     name: Linux ${{ matrix.name }}

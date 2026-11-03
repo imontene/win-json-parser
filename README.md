@@ -4,18 +4,118 @@
 
 Parser de JSON rápido, robusto y conforme a estándares, escrito en C++17 y diseñado para Windows.
 
-> 🚧 Proyecto en fase inicial (v0.1.0).
+> 🚧 Proyecto en desarrollo (v0.5.0). La API puede cambiar hasta la versión 1.0.
 
-## Estado actual
+## Características
 
 - Parser estricto conforme a **RFC 8259**: pasa todos los casos `y_` y `n_` de [JSONTestSuite](https://github.com/nst/JSONTestSuite).
+- **Árbol (DOM)** para trabajar cómodamente con el documento, o **streaming (SAX)** para procesar archivos de cualquier tamaño con memoria constante.
 - Errores con **línea, columna y fragmento** del texto donde falla.
-- Validación de **UTF-8** y lectura de archivos **UTF-8 con o sin BOM y UTF-16 LE/BE** (los que genera el Bloc de notas o PowerShell).
-- Límite de profundidad configurable, para evitar desbordamientos de pila con entradas maliciosas.
+- **UTF-8 validado** y lectura de archivos **UTF-8 con o sin BOM y UTF-16 LE/BE** (los que generan el Bloc de notas o PowerShell), también en streaming.
+- **JSONC** opcional, con comentarios y comas finales como en los ajustes de VS Code y Windows Terminal.
+- Consultas **JSON Pointer** (RFC 6901), por ejemplo `/usuarios/0/nombre`.
+- **Límites de seguridad** configurables (profundidad, longitud de strings y tamaño del documento) frente a entradas maliciosas.
 - Serialización compacta o formateada, con opción de escapar todo lo que no sea ASCII.
-- Herramienta de línea de comandos `wjson.exe`.
+- Herramienta de línea de comandos `wjson.exe` en un único ejecutable, sin dependencias.
 
-Consulta la hoja de ruta en [docs/FEATURES.md](docs/FEATURES.md) y el diseño en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Consulta la hoja de ruta en [docs/FEATURES.md](docs/FEATURES.md), el diseño en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) y el rendimiento en [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+## Uso de la CLI
+
+```text
+wjson validate config.json otro.json       # 0 = válido, 1 = inválido (streaming)
+wjson format --indent 4 data.json          # formatear
+wjson minify data.json > data.min.json     # compactar
+wjson query /items/0/name data.json        # extraer un valor (JSON Pointer)
+wjson query --raw /version package.json    # string sin comillas
+wjson validate --jsonc settings.json       # aceptar comentarios y comas finales
+type data.json | wjson format              # leer desde stdin
+```
+
+Códigos de salida: `0` correcto, `1` JSON inválido, `2` error de uso o de E/S, `3` el puntero de `query` no existe.
+
+Ejemplo de error:
+
+```text
+config.json:3:14: error: unexpected character
+    "b": [1, 2,]
+               ^
+```
+
+> **Git Bash / MSYS2:** estos shells convierten los argumentos que empiezan por `/` en rutas de Windows. Para `query`, usa `MSYS_NO_PATHCONV=1 wjson query /items/0 data.json`. PowerShell y `cmd` no tienen este problema.
+
+## Uso de la biblioteca
+
+### Árbol (DOM)
+
+```cpp
+#include <wjson/wjson.hpp>
+
+auto result = wjson::parse_file(L"C:\\datos\\config.json");
+if (!result) {
+    const auto& e = result.error;
+    std::printf("Error en %zu:%zu: %s\n", e.line, e.column, e.message());
+    return;
+}
+const wjson::Value& doc = *result.value;
+
+if (const wjson::Value* name = doc.find("nombre"))
+    std::puts(name->as_string().c_str());
+
+if (const wjson::Value* city = doc.at_pointer("/usuarios/0/direccion/ciudad"))
+    std::puts(city->as_string().c_str());
+
+std::string pretty = wjson::serialize(doc, {/*indent=*/2});
+```
+
+### Streaming (SAX)
+
+Para archivos muy grandes, hereda de `wjson::Handler` y recibe los eventos sin construir el árbol. Devolver `false` en cualquier callback cancela el parseo.
+
+```cpp
+struct Counter : wjson::Handler {
+    std::size_t objects = 0;
+    bool on_start_object() override { ++objects; return true; }
+};
+
+Counter counter;
+wjson::ParseError error = wjson::parse_file(L"C:\\logs\\eventos.json", counter);
+if (error.ok()) std::printf("%zu objetos\n", counter.objects);
+```
+
+Un `wjson::Handler` sin modificar sirve como validador. También están `wjson::parse_stream(std::istream&, ...)` y `wjson::parse(texto, handler)`.
+
+### Opciones
+
+```cpp
+wjson::ParseOptions options = wjson::ParseOptions::jsonc();  // comentarios + comas finales
+options.max_depth = 64;
+options.max_string_length = 1 << 20;        // 1 MiB por string
+options.max_document_size = 100 << 20;      // 100 MiB por documento
+auto result = wjson::parse(texto, options);
+```
+
+## Instalación
+
+### vcpkg
+
+El repositorio incluye un port *overlay* (todavía no está en el registro oficial):
+
+```powershell
+vcpkg install wjson[tool] --overlay-ports=C:\ruta\a\win-json-parser\ports
+```
+
+### CMake
+
+```cmake
+# Como subproyecto
+add_subdirectory(win-json-parser)
+target_link_libraries(mi_app PRIVATE wjson::wjson)
+
+# O tras instalarlo (cmake --install), o con vcpkg
+find_package(wjson CONFIG REQUIRED)
+target_link_libraries(mi_app PRIVATE wjson::wjson)
+```
 
 ## Compilar
 
@@ -31,53 +131,14 @@ Otros presets: `msvc-x86`, `msvc-arm64`, `clang-cl-x64`, `linux-gcc` y `linux-cl
 
 Los tests descargan [doctest](https://github.com/doctest/doctest) (una sola cabecera, con hash verificado) al configurar. Para compilar sin conexión, pasa `-DWJSON_DOCTEST_INCLUDE_DIR=<carpeta>` o desactiva los tests con `-DWJSON_BUILD_TESTS=OFF`.
 
-## Uso de la CLI
-
-```text
-wjson validate config.json otro.json      # código de salida 0 = válido, 1 = inválido
-wjson format --indent 4 data.json         # formatear
-wjson minify data.json > data.min.json    # compactar
-type data.json | wjson format             # leer desde stdin
-```
-
-Ejemplo de error:
-
-```text
-config.json:3:14: error: unexpected character
-    "b": [1, 2,]
-               ^
-```
-
-## Uso de la biblioteca
-
-```cpp
-#include <wjson/wjson.hpp>
-
-auto result = wjson::parse_file(L"C:\\datos\\config.json");
-if (!result) {
-    const auto& e = result.error;
-    std::printf("Error en %zu:%zu: %s\n", e.line, e.column, e.message());
-    return;
-}
-if (const wjson::Value* name = result.value->find("nombre"))
-    std::puts(name->as_string().c_str());
-
-std::string pretty = wjson::serialize(*result.value, {/*indent=*/2});
-```
-
-Para integrarla en tu proyecto CMake:
-
-```cmake
-add_subdirectory(win-json-parser)
-target_link_libraries(mi_app PRIVATE wjson::wjson)
-```
-
-## Conformidad
+## Conformidad y rendimiento
 
 ```bash
 git clone https://github.com/nst/JSONTestSuite
 python scripts/run_jsontestsuite.py build/msvc-x64/Release/wjson.exe JSONTestSuite/test_parsing
 ```
+
+Para los benchmarks, consulta [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Licencia
 

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(wjson
-    VERSION 0.1.0
+    VERSION 0.5.0
     DESCRIPTION "Strict, fast JSON parser for Windows"
     LANGUAGES CXX)
 
@@ -9,6 +9,7 @@ option(WJSON_BUILD_CLI "Build the wjson command-line tool" ${PROJECT_IS_TOP_LEVE
 option(WJSON_BUILD_TESTS "Build the unit tests" ${PROJECT_IS_TOP_LEVEL})
 option(WJSON_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(WJSON_SANITIZE "Build with AddressSanitizer and UBSan (GCC/Clang)" OFF)
+option(WJSON_INSTALL "Generate install rules and the CMake package" ${PROJECT_IS_TOP_LEVEL})
 
 # Ship a self-contained wjson.exe: link the MSVC runtime statically, unless the
 # parent project (when consumed via add_subdirectory) has decided otherwise.
@@ -64,11 +65,44 @@ if(WJSON_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------------------
-# Install
+# Install and CMake package: find_package(wjson CONFIG) + wjson::wjson
 # ---------------------------------------------------------------------------
-include(GNUInstallDirs)
-install(TARGETS wjson ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-if(WJSON_BUILD_CLI)
-    install(TARGETS wjson_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(WJSON_INSTALL)
+    include(GNUInstallDirs)
+    include(CMakePackageConfigHelpers)
+    set(WJSON_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/wjson")
+
+    install(TARGETS wjson EXPORT wjsonTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(EXPORT wjsonTargets NAMESPACE wjson:: DESTINATION ${WJSON_CMAKE_DIR})
+
+    configure_package_config_file(cmake/wjsonConfig.cmake.in
+        "${CMAKE_CURRENT_BINARY_DIR}/wjsonConfig.cmake"
+        INSTALL_DESTINATION ${WJSON_CMAKE_DIR})
+    # Before 1.0, a new minor version may break the API.
+    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/wjsonConfigVersion.cmake"
+        COMPATIBILITY SameMinorVersion)
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/wjsonConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/wjsonConfigVersion.cmake"
+        DESTINATION ${WJSON_CMAKE_DIR})
+
+    if(WJSON_BUILD_CLI)
+        install(TARGETS wjson_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Benchmarks (off by default; see scripts/fetch_benchmark_data.py)
+# ---------------------------------------------------------------------------
+option(WJSON_BUILD_BENCHMARKS "Build the wjson_bench benchmark" OFF)
+if(WJSON_BUILD_BENCHMARKS)
+    add_executable(wjson_bench bench/bench.cpp)
+    target_link_libraries(wjson_bench PRIVATE wjson::wjson)
+    set_target_properties(wjson_bench PROPERTIES CXX_EXTENSIONS OFF)
+    wjson_set_compiler_options(wjson_bench)
 endif()

@@ -7,8 +7,9 @@ Toda la lógica JSON vive en la biblioteca `wjson`. Las interfaces de usuario (l
 ```
                 ┌──────────────────────────────────────────┐
                 │           Biblioteca  wjson              │
-                │  parse · parse_file · serialize          │
-                │  decode_text (UTF-8 / UTF-16 + BOM)      │
+                │  DOM: parse · parse_file · serialize     │
+                │  SAX: Handler · parse_stream · JSONC     │
+                │  JSON Pointer · límites de seguridad     │
                 │  ParseError {code, line, column, offset} │
                 └───────────────┬──────────────────────────┘
           ┌─────────────────────┼──────────────────────┬───────────────────┐
@@ -24,12 +25,34 @@ Toda la lógica JSON vive en la biblioteca `wjson`. Las interfaces de usuario (l
 | Ruta | Contenido |
 |---|---|
 | `include/wjson/wjson.hpp` | API pública (única cabecera que incluyen los usuarios). |
-| `src/` | Implementación: `parser.cpp`, `writer.cpp`, `encoding.cpp`, `value.cpp` y utilidades internas (`utf8.hpp`). |
-| `cli/` | Herramienta `wjson.exe` (`validate`, `format`, `minify`). |
-| `tests/` | Tests unitarios (doctest) y datos de prueba. |
-| `scripts/` | Utilidades, por ejemplo el ejecutor de JSONTestSuite. |
-| `cmake/` | Módulos CMake (opciones de compilador y warnings). |
+| `src/` | Implementación (ver abajo). |
+| `cli/` | Herramienta `wjson.exe` (`validate`, `format`, `minify`, `query`). |
+| `tests/` | Tests unitarios (doctest), datos de prueba y `tests/package/` (proyecto que consume el paquete instalado). |
+| `bench/` | Benchmark de rendimiento `wjson_bench`. |
+| `ports/wjson/` | Port *overlay* de vcpkg. |
+| `scripts/` | Ejecutor de JSONTestSuite y descarga de los datos de benchmark. |
+| `cmake/` | Opciones de compilador y plantilla del paquete CMake. |
 | `.github/workflows/` | Integración continua. |
+
+## Cómo está organizado el parser
+
+La gramática JSON está escrita **una sola vez** (`src/reader.hpp`) como plantilla sobre dos piezas intercambiables:
+
+```
+     Fuente (Source)                 Gramática                 Destino (Sink)
+ ┌──────────────────────┐      ┌────────────────────┐      ┌──────────────────────┐
+ │ MemorySource         │      │ Reader<Src, Sink>  │      │ DomBuilder → Value   │
+ │   texto en memoria   │ ───► │  JSON + JSONC      │ ───► │                      │
+ │ StreamSource         │      │  límites, errores  │      │ HandlerSink → tu     │
+ │   std::istream por   │      │                    │      │   wjson::Handler     │
+ │   bloques, UTF-16→8  │      │                    │      │                      │
+ └──────────────────────┘      └────────────────────┘      └──────────────────────┘
+```
+
+- **Fuentes** (`src/sources.hpp`). `MemorySource` lee un texto completo y calcula la línea y la columna solo cuando hay un error. `StreamSource` lee bloques de tamaño fijo (`stream_buffer_size`), convierte UTF-16 a UTF-8 al vuelo y lleva la cuenta de línea y columna mientras avanza.
+- **Destinos** (`src/parser.cpp`). `DomBuilder` construye el árbol `Value`; `HandlerSink` reenvía los eventos al `wjson::Handler` del usuario.
+
+Así, cualquier cambio en la gramática (por ejemplo, JSON5) se aplica a la vez al DOM y al streaming. Los tests comprueban que ambos caminos producen exactamente los mismos eventos y errores, incluso con buffers de 4 bytes que cortan tokens a la mitad.
 
 ## Decisiones de diseño que facilitan una futura GUI
 

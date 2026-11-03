@@ -17,3 +17,6 @@ __pycache__/
 
 # Local copy of JSONTestSuite
 /JSONTestSuite/
+
+# Benchmark data (scripts/fetch_benchmark_data.py)
+/bench-data/
