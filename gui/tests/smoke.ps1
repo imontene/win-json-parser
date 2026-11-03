@@ -39,6 +39,18 @@ function Save-Screenshot([string] $Name) {
     }
 }
 
+$env:WJSON_VIEWER_LOG = Join-Path $OutputDir 'viewer.log'
+
+function Write-Diagnostics {
+    if (Test-Path $env:WJSON_VIEWER_LOG) {
+        Write-Host '--- viewer.log'
+        Get-Content $env:WJSON_VIEWER_LOG | Write-Host
+    }
+    Write-Host '--- recent Application event log errors'
+    Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Level = 2; StartTime = (Get-Date).AddMinutes(-10) } -MaxEvents 5 -ErrorAction SilentlyContinue |
+        ForEach-Object { Write-Host "[$($_.ProviderName)] $($_.Message)" }
+}
+
 function Test-Scenario([string] $Name, [string[]] $Arguments, [string] $ExpectedTitle) {
     Write-Host "== $Name"
     $process = Start-Process -FilePath $Exe -ArgumentList $Arguments -PassThru
@@ -60,6 +72,9 @@ function Test-Scenario([string] $Name, [string[]] $Arguments, [string] $Expected
         if ($process.HasExited) { throw "${Name}: the viewer exited with code $($process.ExitCode)" }
         Write-Host "window: '$($process.MainWindowTitle)'"
         Save-Screenshot $Name
+    } catch {
+        Write-Diagnostics
+        throw
     } finally {
         if (-not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
     }

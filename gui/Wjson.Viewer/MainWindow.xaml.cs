@@ -106,6 +106,40 @@ namespace Wjson.Viewer
 
         private bool IsDark => ((FrameworkElement)Content).ActualTheme == ElementTheme.Dark;
 
+        /// <summary>
+        /// A theme brush by key (e.g. "SystemFillColorCriticalBrush"). Looks in
+        /// the theme dictionaries for the current theme, with a fallback so a
+        /// missing key never crashes the app.
+        /// </summary>
+        private Brush ThemeBrush(string key, Windows.UI.Color fallback)
+        {
+            var themeKey = IsDark ? "Dark" : "Light";
+            object? found = null;
+            bool Search(ResourceDictionary dictionary)
+            {
+                if (dictionary.ThemeDictionaries.TryGetValue(themeKey, out var theme) && theme is ResourceDictionary td &&
+                    td.TryGetValue(key, out found)) return true;
+                if (dictionary.TryGetValue(key, out found)) return true;
+                foreach (var merged in dictionary.MergedDictionaries)
+                    if (Search(merged)) return true;
+                return false;
+            }
+            try
+            {
+                if (Search(Application.Current.Resources) && found is Brush brush) return brush;
+            }
+            catch (Exception e)
+            {
+                App.Log(e);
+            }
+            return new SolidColorBrush(fallback);
+        }
+
+        private Brush SecondaryTextBrush => ThemeBrush("TextFillColorSecondaryBrush", ColorHelper.FromArgb(255, 0x80, 0x80, 0x80));
+        private Brush PrimaryTextBrush => ThemeBrush("TextFillColorPrimaryBrush", IsDark ? Colors.White : Colors.Black);
+        private Brush SuccessBrush => ThemeBrush("SystemFillColorSuccessBrush", ColorHelper.FromArgb(255, 0x0F, 0x7B, 0x0F));
+        private Brush CriticalBrush => ThemeBrush("SystemFillColorCriticalBrush", ColorHelper.FromArgb(255, 0xC4, 0x2B, 0x1C));
+
         private Brush BrushFor(NodeKind kind)
         {
             var dark = IsDark;
@@ -322,14 +356,14 @@ namespace Wjson.Viewer
             if (result == null)
             {
                 StatusIcon.Glyph = "\uE946"; // info
-                StatusIcon.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+                StatusIcon.Foreground = SecondaryTextBrush;
                 StatusText.Text = Strings.Get("Empty");
                 Tree.RootNodes.Clear();
             }
             else if (valid)
             {
                 StatusIcon.Glyph = "\uE73E"; // check mark
-                StatusIcon.Foreground = (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"];
+                StatusIcon.Foreground = SuccessBrush;
                 StatusText.Text = Strings.Get("Valid");
                 if (result.Root != null) RebuildTree(result.Root);
                 else Tree.RootNodes.Clear();
@@ -338,7 +372,7 @@ namespace Wjson.Viewer
             else
             {
                 StatusIcon.Glyph = "\uE783"; // error
-                StatusIcon.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+                StatusIcon.Foreground = CriticalBrush;
                 StatusText.Text = result.Message;
                 Tree.Opacity = 0.45; // the tree shows the last valid version
             }
@@ -465,7 +499,7 @@ namespace Wjson.Viewer
             _selected = node;
             CopyPointerButton.IsEnabled = node != null;
             CopyValueButton.IsEnabled = node != null && node.Kind != NodeKind.Range;
-            SelectionText.Foreground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
+            SelectionText.Foreground = PrimaryTextBrush;
             SelectionText.Text = node == null ? "" : node.Pointer.Length == 0 ? "\"\"  (" + Strings.Get("Root") + ")" : node.Pointer;
         }
 
@@ -517,7 +551,7 @@ namespace Wjson.Viewer
         private void ShowNavigationError(string message)
         {
             ShowSelection(null);
-            SelectionText.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+            SelectionText.Foreground = CriticalBrush;
             SelectionText.Text = message;
         }
 
