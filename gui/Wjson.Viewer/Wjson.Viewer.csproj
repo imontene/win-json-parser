@@ -33,4 +33,9 @@
     <ProjectReference Include="../Wjson.Viewer.Core/Wjson.Viewer.Core.csproj" />
   </ItemGroup>
 
+  <!-- Embedded copy of the window markup, used only to diagnose XAML load failures (App.ProbeXaml). -->
+  <ItemGroup>
+    <EmbeddedResource Include="MainWindow.xaml" LogicalName="Wjson.Viewer.MainWindow.xaml" />
+  </ItemGroup>
+
 </Project>
