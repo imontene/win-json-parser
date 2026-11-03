@@ -54,4 +54,15 @@ jobs:
           if (-not $env:PSGALLERY_API_KEY) { throw 'The PSGALLERY_API_KEY secret is not set' }
           $zip = Get-ChildItem dist -Filter 'Wjson-powershell-*.zip' | Select-Object -First 1
           Expand-Archive $zip.FullName -DestinationPath module
+          $manifest = Import-PowerShellDataFile module/Wjson/Wjson.psd1
+          # A 403 usually means the name belongs to another account: report who owns it.
+          $existing = Find-Module Wjson -Repository PSGallery -AllVersions -ErrorAction SilentlyContinue
+          if ($existing) {
+            $existing | Select-Object -First 5 Name, Version, Author, PublishedDate | Format-Table | Out-String | Write-Host
+            if ($existing.Author -notcontains $manifest.Author) {
+              throw "The name 'Wjson' is already taken on the PowerShell Gallery by '$($existing[0].Author)'. Rename the module."
+            }
+          } else {
+            Write-Host "'Wjson' is not on the PowerShell Gallery yet."
+          }
           Publish-Module -Path module/Wjson -NuGetApiKey $env:PSGALLERY_API_KEY
