@@ -36,6 +36,9 @@ namespace Wjson.Viewer
         public string Label { get; }
         public string ValueText { get; }
         public Brush ValueBrush { get; }
+
+        // Shown by the TreeView's default item template.
+        public override string ToString() => Node.Kind == NodeKind.Range ? Label : Label + ":  " + ValueText;
     }
 
     public sealed partial class MainWindow : Window
@@ -65,6 +68,18 @@ namespace Wjson.Viewer
             _validateTimer.Interval = TimeSpan.FromMilliseconds(350);
             _validateTimer.IsRepeating = false;
             _validateTimer.Tick += async (_, _) => await ValidateAsync();
+
+            try
+            {
+                // The tree is read-only: no drag and drop of nodes.
+                Tree.CanDragItems = false;
+                Tree.CanReorderItems = false;
+                Tree.AllowDrop = false;
+            }
+            catch (Exception e)
+            {
+                App.Log(e);
+            }
 
             AppWindow.Closing += AppWindow_Closing;
             ApplyStrings();

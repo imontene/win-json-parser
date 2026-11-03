@@ -85,27 +85,12 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
+                    <!-- Nodes display NodeItem.ToString(); drag settings are applied in code. -->
                     <TreeView
                         x:Name="Tree"
                         SelectionMode="Single"
-                        CanDragItems="False"
-                        CanReorderItems="False"
-                        AllowDrop="False"
                         Expanding="Tree_Expanding"
-                        ItemInvoked="Tree_ItemInvoked">
-                        <TreeView.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="{Binding Content.Label}" FontWeight="SemiBold" />
-                                    <TextBlock
-                                        Text="{Binding Content.ValueText}"
-                                        Foreground="{Binding Content.ValueBrush}"
-                                        FontFamily="Cascadia Mono, Consolas"
-                                        TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </TreeView.ItemTemplate>
-                    </TreeView>
+                        ItemInvoked="Tree_ItemInvoked" />
                 </Border>
 
                 <!-- Selected node -->
