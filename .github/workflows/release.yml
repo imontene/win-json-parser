@@ -40,9 +40,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - { arch: x64, cmake_arch: x64, rid: win-x64, test: true }
-          - { arch: x86, cmake_arch: Win32, rid: win-x86, test: true }
-          - { arch: arm64, cmake_arch: ARM64, rid: win-arm64, test: false }
+          - { arch: x64, cmake_arch: x64, rid: win-x64, platform: x64, test: true }
+          - { arch: x86, cmake_arch: Win32, rid: win-x86, platform: x86, test: true }
+          - { arch: arm64, cmake_arch: ARM64, rid: win-arm64, platform: ARM64, test: false }
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
@@ -62,6 +62,9 @@ jobs:
           cmake -S . -B build/dll -A ${{ matrix.cmake_arch }} -DBUILD_SHARED_LIBS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DWJSON_BUILD_TESTS=OFF -DWJSON_BUILD_CLI=OFF
           cmake --build build/dll --config Release --parallel
 
+      - name: Build wjson Viewer
+        run: dotnet publish gui/Wjson.Viewer -c Release -r ${{ matrix.rid }} -p:Platform=${{ matrix.platform }} "-p:Version=${{ env.VERSION }}" "-p:WjsonLocalNative=${{ github.workspace }}/build/dll/Release/wjson.dll" -o stage/viewer
+
       - name: Package
         shell: pwsh
         run: |
@@ -69,6 +72,8 @@ jobs:
           New-Item -ItemType Directory -Force $zipDir, "dist", "native/${{ matrix.rid }}/native" | Out-Null
           Copy-Item build/cli/Release/wjson.exe, LICENSE, README.md $zipDir
           Compress-Archive -Path "$zipDir/*" -DestinationPath "dist/wjson-$env:VERSION-windows-${{ matrix.arch }}.zip"
+          Copy-Item LICENSE stage/viewer/
+          Compress-Archive -Path "stage/viewer/*" -DestinationPath "dist/wjson-viewer-$env:VERSION-windows-${{ matrix.arch }}.zip"
           Copy-Item build/dll/Release/wjson.dll "native/${{ matrix.rid }}/native/"
           Copy-Item build/dll/Release/wjson.pdb "native/${{ matrix.rid }}/native/" -ErrorAction SilentlyContinue
 

@@ -15,7 +15,7 @@ Toda la lógica JSON vive en la biblioteca `wjson`. Las interfaces de usuario (l
           ┌─────────────────────┼──────────────────────┬───────────────────┐
           │                     │                      │                   │
    ┌──────▼──────┐    ┌─────────▼────────┐   ┌─────────▼────────┐  ┌───────▼───────┐
-   │ wjson.exe   │    │ GUI (futuro)     │   │ API C → .NET →   │  │ Tu aplicación │
+   │ wjson.exe   │    │ wjson Viewer     │   │ API C → .NET →   │  │ Tu aplicación │
    │ (cli/)      │    │ (gui/)           │   │ PowerShell       │  │ (vcpkg/NuGet) │
    └─────────────┘    └──────────────────┘   └──────────────────┘  └───────────────┘
 ```
@@ -33,6 +33,7 @@ Toda la lógica JSON vive en la biblioteca `wjson`. Las interfaces de usuario (l
 | `fuzz/` | Objetivo de fuzzing (libFuzzer) y driver para reproducir entradas. |
 | `bindings/dotnet/` | Binding .NET (P/Invoke sobre la API en C) y sus tests. |
 | `bindings/powershell/` | Módulo de PowerShell `Wjson` y sus tests (Pester). |
+| `gui/` | wjson Viewer, la aplicación de escritorio (WinUI 3), su lógica y sus tests. |
 | `ports/wjson/` | Port *overlay* de vcpkg. |
 | `scripts/` | Ejecutor de JSONTestSuite y descarga de los datos de benchmark. |
 | `cmake/` | Opciones de compilador y plantilla del paquete CMake. |
@@ -58,7 +59,7 @@ La gramática JSON está escrita **una sola vez** (`src/reader.hpp`) como planti
 
 Así, cualquier cambio en la gramática (por ejemplo, JSON5) se aplica a la vez al DOM y al streaming. Los tests comprueban que ambos caminos producen exactamente los mismos eventos y errores, incluso con buffers de 4 bytes que cortan tokens a la mitad.
 
-## Decisiones de diseño que facilitan una futura GUI
+## Decisiones de diseño que facilitan la GUI
 
 - **La biblioteca no escribe en consola ni termina el proceso.** Devuelve resultados (`ParseResult`) y nunca llama a `exit()` ni imprime nada, así que se puede usar dentro de una ventana sin efectos secundarios.
 - **Errores estructurados.** `ParseError` trae un `ErrorCode` estable, la línea, la columna y el offset en bytes. Una GUI puede subrayar el error en un editor, saltar a la posición o traducir el mensaje (los textos en inglés de `message()` son solo un valor por defecto).
@@ -66,22 +67,30 @@ Así, cualquier cambio en la gramática (por ejemplo, JSON5) se aplica a la vez 
 - **Objetos que conservan el orden.** Un visor en árbol muestra las claves tal y como aparecen en el archivo.
 - **Sin estado global.** Se pueden parsear varios documentos en paralelo, por ejemplo en un hilo de fondo para que la ventana no se congele.
 
-## Cómo se añadiría la GUI
+## La GUI: wjson Viewer
 
-1. Crear `gui/` con su propio `CMakeLists.txt` y una opción `WJSON_BUILD_GUI` (desactivada por defecto) que enlace con `wjson::wjson`, igual que la CLI.
-2. Elegir la tecnología. Estas son las candidatas:
+La GUI es una aplicación **WinUI 3** (Windows App SDK 1.8) escrita en C#, que usa la biblioteca a través del binding de .NET:
 
-   | Opción | Ventajas | Inconvenientes |
-   |---|---|---|
-   | **WinUI 3** (Windows App SDK, C++/WinRT) | Aspecto nativo de Windows 11, Fluent Design, distribución MSIX. | Solo Windows; requiere Visual Studio y su toolchain. |
-   | **Win32 + Direct2D** | Ejecutable mínimo, sin dependencias. | Mucho más código para una interfaz moderna. |
-   | **Qt 6** | Multiplataforma, widgets de árbol y editor ya hechos. | Dependencia grande; licencia LGPL/comercial. |
-   | **Dear ImGui** | Muy rápido de desarrollar; ideal para herramientas internas. | Aspecto poco nativo. |
+```
+ WjsonViewer.exe (WinUI 3)  →  Wjson.Viewer.Core  →  Imontene.Wjson (.NET)  →  wjson.dll
+```
 
-   Para un visor/editor pensado para Windows, **WinUI 3** es la opción más natural.
-3. Funcionalidades típicas de la GUI: vista en árbol, editor con resaltado y errores en vivo, formatear y minificar, búsqueda con JSON Pointer, comparación de dos archivos y apertura de archivos grandes.
+| Proyecto | Contenido |
+|---|---|
+| `gui/Wjson.Viewer.Core` | Lógica sin interfaz, que se prueba en cualquier sistema: árbol perezoso (los hijos se crean al expandir, y los contenedores de más de 1000 elementos se dividen en rangos), navegación por JSON Pointer, conversión de línea y columna a posición en el texto, carga y guardado que respetan codificación y finales de línea, modo streaming para archivos grandes, textos en español e inglés (incluidos los errores del parser, traducidos por su código) y un serializador para copiar nodos. |
+| `gui/Wjson.Viewer.Core.Tests` | Tests de xUnit de la lógica. |
+| `gui/Wjson.Viewer` | La ventana (XAML y code-behind): editor, árbol, barra de estado, abrir, guardar y arrastrar archivos. |
+| `gui/tests/smoke.ps1` | Prueba de humo del CI: abre la app con archivos de ejemplo, comprueba que la ventana aparece y captura pantallas. |
 
-La GUI se apoyará en features que ya están en la hoja de ruta ([FEATURES.md](FEATURES.md)): el **parser en streaming** e **incremental** para archivos de varios GB sin bloquear la interfaz, y callbacks de **progreso y cancelación**.
+Algunos detalles:
+
+- **Aplicación sin empaquetar y autocontenida**: no necesita instalar .NET ni el runtime de Windows App SDK; basta con descomprimir el zip. `EnableMsixTooling` debe seguir activado, porque genera el `resources.pri` del que dependen los controles de WinUI.
+- **Validación en vivo**: el texto se valida en segundo plano 350 ms después de la última pulsación. Cuando hay un error, el árbol conserva la última versión válida, atenuada.
+- **Archivos grandes** (más de 8 MB): se abren en solo lectura y se validan en streaming, sin cargar el texto en el editor. A partir de 256 MB tampoco se construye el árbol.
+- **Finales de línea**: el `TextBox` de WinUI guarda los saltos de línea como `\r`. Al guardar se restauran los del archivo original (LF o CRLF).
+- **Idioma**: el de Windows, o el que se indique con `--lang es` / `--lang en`.
+
+Pendiente: comparación de dos archivos, resaltado de sintaxis en el editor, enlace entre la selección del árbol y el texto, y progreso y cancelación al abrir archivos muy grandes.
 
 ## Capas para otros lenguajes
 

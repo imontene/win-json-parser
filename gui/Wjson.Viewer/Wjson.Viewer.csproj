@@ -22,7 +22,7 @@
     <SelfContained>true</SelfContained>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <Version>1.1.0</Version>
+    <!-- The release workflow passes -p:Version from the tag. -->
     <Product>wjson Viewer</Product>
     <Copyright>(c) 2026 imontene and win-json-parser contributors. MIT License.</Copyright>
   </PropertyGroup>
