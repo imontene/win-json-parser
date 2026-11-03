@@ -20,3 +20,9 @@ __pycache__/
 
 # Benchmark data (scripts/fetch_benchmark_data.py)
 /bench-data/
+
+# .NET and PowerShell build output
+bin/
+obj/
+/out/
+/bindings/powershell/out/

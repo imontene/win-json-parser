@@ -165,6 +165,63 @@ jobs:
           & $tool --version
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+  bindings:
+    # .NET binding and PowerShell module over the native DLL.
+    name: .NET + PowerShell (x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build wjson.dll
+        run: |
+          cmake -S . -B build/dll -A x64 -DBUILD_SHARED_LIBS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DWJSON_BUILD_TESTS=OFF -DWJSON_BUILD_CLI=OFF
+          cmake --build build/dll --config Release --parallel
+          New-Item -ItemType Directory -Force native/win-x64/native | Out-Null
+          Copy-Item build/dll/Release/wjson.dll native/win-x64/native/
+
+      - name: .NET tests
+        run: dotnet test bindings/dotnet/tests/Wjson.Tests -c Release "-p:WjsonNativeLibrary=${{ github.workspace }}/build/dll/Release/wjson.dll"
+
+      - name: NuGet package (x64 only)
+        run: dotnet pack bindings/dotnet/src/Wjson -c Release -o out/nuget "-p:WjsonNativeRoot=${{ github.workspace }}/native"
+
+      - name: Build PowerShell module
+        shell: pwsh
+        run: ./bindings/powershell/build.ps1 -NativeRoot native -OutputPath out/Wjson
+
+      - name: Pester (PowerShell 7)
+        shell: pwsh
+        run: |
+          if (-not (Get-Module Pester -ListAvailable | Where-Object Version -ge '5.5.0')) {
+            Install-Module Pester -MinimumVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
+          }
+          $env:WJSON_MODULE_PATH = "${{ github.workspace }}/out/Wjson"
+          $config = New-PesterConfiguration
+          $config.Run.Path = 'bindings/powershell/tests'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
+      - name: Windows PowerShell 5.1 smoke test
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module ./out/Wjson/Wjson.psd1
+          if (-not (Test-WJson '{"a": [1, 2]}')) { throw 'Test-WJson failed' }
+          if (Test-WJson '[1,') { throw 'invalid JSON accepted' }
+          $o = ConvertFrom-WJson '{"name": "wjson", "n": [1, 2, 3]}'
+          if ($o.name -ne 'wjson' -or $o.n.Count -ne 3) { throw 'ConvertFrom-WJson failed' }
+          if ((Format-WJson '[1, /* c */ 2,]' -Jsonc -Minify) -ne '[1,2]') { throw 'Format-WJson failed' }
+          if ((Get-WJsonValue '/n/2' '{"n": [1, 2, 3]}') -ne 3) { throw 'Get-WJsonValue failed' }
+          "Windows PowerShell $($PSVersionTable.PSVersion): OK"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bindings-x64
+          path: |
+            out/nuget/*.nupkg
+            out/Wjson/
+
   benchmark:
     # Publishes throughput figures in the run summary. Shared CI machines are
     # noisy, so compare trends rather than single numbers.

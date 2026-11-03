@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Wjson</RootNamespace>
+    <AssemblyName>Wjson</AssemblyName>
+    <Version>1.0.0</Version>
+
+    <!-- NuGet package -->
+    <PackageId>Imontene.Wjson</PackageId>
+    <Authors>imontene</Authors>
+    <Description>.NET bindings for wjson: a strict, fast JSON parser for Windows with JSONC, JSON Pointer, UTF-16 input and streaming validation.</Description>
+    <PackageTags>json;jsonc;parser;json-pointer;windows;native</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/imontene/win-json-parser</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/imontene/win-json-parser</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!--
+    Native libraries: WjsonNativeRoot points to a folder laid out as
+    <rid>/native/wjson.dll (or libwjson.so), e.g. win-x64/native/wjson.dll.
+    CI fills it with the x64, x86 and ARM64 builds before packing.
+  -->
+  <ItemGroup Condition="'$(WjsonNativeRoot)' != ''">
+    <None Include="$(WjsonNativeRoot)/**/*" Pack="true" PackagePath="runtimes/" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="build/Imontene.Wjson.targets" Pack="true" PackagePath="buildTransitive/" />
+  </ItemGroup>
+
+</Project>

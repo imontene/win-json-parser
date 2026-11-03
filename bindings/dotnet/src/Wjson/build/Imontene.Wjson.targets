@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    .NET Framework projects do not copy native assets from runtimes/ by
+    themselves. Copy them to the output, keeping the runtimes/<rid>/native
+    layout that the Wjson native loader looks for.
+  -->
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
+    <None Include="$(MSBuildThisFileDirectory)../runtimes/**/wjson.dll"
+          Link="runtimes/%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          Visible="false" />
+  </ItemGroup>
+</Project>
