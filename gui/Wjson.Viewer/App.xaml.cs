@@ -41,7 +41,7 @@ namespace Wjson.Viewer
         }
 
         /// <summary>
-        /// Command line: WjsonViewer.exe [file] [--pointer /json/pointer]
+        /// Command line: WjsonViewer.exe [file] [--pointer /json/pointer] [--lang es|en]
         /// </summary>
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
@@ -54,6 +54,18 @@ namespace Wjson.Viewer
                 Log(e);
                 if (e is XamlParseException) ProbeXaml();
                 throw;
+            }
+        }
+
+        private static void SetLanguage(string name)
+        {
+            try
+            {
+                Wjson.Viewer.Core.Strings.Culture = System.Globalization.CultureInfo.GetCultureInfo(name);
+            }
+            catch (System.Globalization.CultureNotFoundException)
+            {
+                // Unknown language: keep the Windows display language.
             }
         }
 
@@ -99,17 +111,18 @@ namespace Wjson.Viewer
 
         private async System.Threading.Tasks.Task LaunchAsync()
         {
-            _window = new MainWindow();
-            _window.Activate();
-
             string? file = null;
             string? pointer = null;
             var argv = Environment.GetCommandLineArgs();
             for (var i = 1; i < argv.Length; ++i)
             {
                 if (argv[i] == "--pointer" && i + 1 < argv.Length) pointer = argv[++i];
+                else if (argv[i] == "--lang" && i + 1 < argv.Length) SetLanguage(argv[++i]);
                 else file ??= argv[i];
             }
+
+            _window = new MainWindow();
+            _window.Activate();
             if (file != null) await _window.OpenFileAsync(Path.GetFullPath(file), pointer);
         }
     }
