@@ -1,0 +1,44 @@
+name: GUI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  viewer:
+    name: wjson Viewer (WinUI 3, x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build wjson.dll
+        run: |
+          cmake -S . -B build/dll -A x64 -DBUILD_SHARED_LIBS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DWJSON_BUILD_TESTS=OFF -DWJSON_BUILD_CLI=OFF
+          cmake --build build/dll --config Release --parallel
+
+      - name: Core tests
+        run: dotnet test gui/Wjson.Viewer.Core.Tests -c Release "-p:WjsonLocalNative=${{ github.workspace }}/build/dll/Release/wjson.dll"
+
+      - name: Publish viewer
+        run: dotnet publish gui/Wjson.Viewer -c Release -r win-x64 -p:Platform=x64 "-p:WjsonLocalNative=${{ github.workspace }}/build/dll/Release/wjson.dll" -o out/viewer
+
+      - name: Smoke test and screenshots
+        shell: pwsh
+        run: ./gui/tests/smoke.ps1 -Exe out/viewer/WjsonViewer.exe -Samples gui/samples -OutputDir screenshots -PrintScreenshots
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: wjson-viewer-win-x64
+          path: |
+            out/viewer/
+            screenshots/

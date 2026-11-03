@@ -1,0 +1,7 @@
+{
+  "proyecto": "wjson Viewer",
+  "tiendas": [
+    {"id": 1, "ciudad": "Madrid", "abierta": true},
+    {"id": 2, "ciudad": "Sevilla", "abierta": tru},
+  ]
+}

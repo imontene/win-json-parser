@@ -1,0 +1,6 @@
+// Ajustes al estilo de VS Code (JSONC)
+{
+  "editor.fontSize": 14, // tamaño de letra
+  /* lista de exclusiones */
+  "files.exclude": ["build", "out",],
+}

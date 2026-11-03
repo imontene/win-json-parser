@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    How the viewer gets wjson:
+      default                          the published NuGet package Imontene.Wjson
+      -p:WjsonLocalNative=<file>       the .NET binding in this repository plus that
+                                       native library (wjson.dll or libwjson.so),
+                                       e.g. one built with -DBUILD_SHARED_LIBS=ON
+  -->
+  <ItemGroup Condition="'$(WjsonLocalNative)' == ''">
+    <PackageReference Include="Imontene.Wjson" Version="1.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(WjsonLocalNative)' != ''">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../bindings/dotnet/src/Wjson/Wjson.csproj" />
+    <None Include="$(WjsonLocalNative)" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>

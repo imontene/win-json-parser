@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- UI-independent logic of the viewer, testable on any OS. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Wjson.Viewer.Core</RootNamespace>
+  </PropertyGroup>
+
+  <Import Project="../WjsonReference.targets" />
+
+</Project>

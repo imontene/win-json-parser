@@ -26,3 +26,6 @@ bin/
 obj/
 /out/
 /bindings/powershell/out/
+
+# Viewer screenshots from gui/tests/smoke.ps1
+/screenshots/
