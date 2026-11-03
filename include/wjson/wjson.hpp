@@ -15,6 +15,8 @@
 #include <variant>
 #include <vector>
 
+#include "wjson/export.h"
+
 namespace wjson {
 
 class Value;
@@ -58,7 +60,7 @@ public:
     bool as_bool() const { return std::get<bool>(data_); }
     std::int64_t as_integer() const { return std::get<std::int64_t>(data_); }
     // Accepts both integers and doubles.
-    double as_double() const;
+    WJSON_API double as_double() const;
     const std::string& as_string() const { return std::get<std::string>(data_); }
     std::string& as_string() { return std::get<std::string>(data_); }
     const Array& as_array() const { return std::get<Array>(data_); }
@@ -67,14 +69,14 @@ public:
     Object& as_object() { return std::get<Object>(data_); }
 
     // Object lookup; returns nullptr if this is not an object or the key is missing.
-    const Value* find(std::string_view key) const noexcept;
-    Value* find(std::string_view key) noexcept;
+    WJSON_API const Value* find(std::string_view key) const noexcept;
+    WJSON_API Value* find(std::string_view key) noexcept;
 
     // JSON Pointer lookup (RFC 6901), e.g. "/users/0/name". "" is the value
     // itself; "~0" and "~1" escape '~' and '/'. Returns nullptr if the path
     // does not exist or the pointer is malformed.
-    const Value* at_pointer(std::string_view pointer) const noexcept;
-    Value* at_pointer(std::string_view pointer) noexcept;
+    WJSON_API const Value* at_pointer(std::string_view pointer) const noexcept;
+    WJSON_API Value* at_pointer(std::string_view pointer) noexcept;
 
     friend bool operator==(const Value& a, const Value& b) { return a.data_ == b.data_; }
     friend bool operator!=(const Value& a, const Value& b) { return !(a == b); }
@@ -118,7 +120,7 @@ enum class ErrorCode {
     Cancelled,
 };
 
-const char* message(ErrorCode code) noexcept;
+WJSON_API const char* message(ErrorCode code) noexcept;
 
 struct ParseError {
     ErrorCode code = ErrorCode::None;
@@ -170,15 +172,15 @@ struct ParseResult {
 
 // Parses UTF-8 text into a tree (DOM). Strict RFC 8259 unless extensions
 // are enabled in the options. A BOM is not accepted here; see decode_text().
-ParseResult parse(std::string_view utf8_text, const ParseOptions& options = {});
+WJSON_API ParseResult parse(std::string_view utf8_text, const ParseOptions& options = {});
 
 // Reads a whole file, detects its encoding (UTF-8 with or without BOM, UTF-16
 // LE/BE with BOM) and parses it into a tree. I/O failures are reported as
 // ErrorCode::IoError.
-ParseResult parse_file(const std::filesystem::path& path, const ParseOptions& options = {});
+WJSON_API ParseResult parse_file(const std::filesystem::path& path, const ParseOptions& options = {});
 
 // Like parse_file() but reads from a stream (for example std::cin).
-ParseResult parse_stream(std::istream& in, const ParseOptions& options = {});
+WJSON_API ParseResult parse_stream(std::istream& in, const ParseOptions& options = {});
 
 // ---------------------------------------------------------------------------
 // Streaming (SAX) parsing
@@ -206,16 +208,16 @@ public:
 };
 
 // Parses UTF-8 text and sends events to the handler.
-ParseError parse(std::string_view utf8_text, Handler& handler, const ParseOptions& options = {});
+WJSON_API ParseError parse(std::string_view utf8_text, Handler& handler, const ParseOptions& options = {});
 
 // Parses a stream in chunks with constant memory use, regardless of the
 // document size. Detects UTF-8 (with or without BOM) and UTF-16 LE/BE (with
 // BOM). Error offsets refer to the UTF-8 decoded text.
-ParseError parse_stream(std::istream& in, Handler& handler, const ParseOptions& options = {});
+WJSON_API ParseError parse_stream(std::istream& in, Handler& handler, const ParseOptions& options = {});
 
 // Streams a file through the handler (constant memory, see parse_stream).
-ParseError parse_file(const std::filesystem::path& path, Handler& handler,
-                      const ParseOptions& options = {});
+WJSON_API ParseError parse_file(const std::filesystem::path& path, Handler& handler,
+                                const ParseOptions& options = {});
 
 // ---------------------------------------------------------------------------
 // Encoding helpers
@@ -224,14 +226,14 @@ ParseError parse_file(const std::filesystem::path& path, Handler& handler,
 // Converts raw bytes to UTF-8 based on the BOM: strips a UTF-8 BOM and
 // converts UTF-16 LE/BE. Bytes without a BOM are returned unchanged.
 // Returns std::nullopt if the UTF-16 data is malformed.
-std::optional<std::string> decode_text(std::string_view raw_bytes);
+WJSON_API std::optional<std::string> decode_text(std::string_view raw_bytes);
 
 // Converts UTF-16 (e.g. Windows wchar_t strings) to UTF-8.
 // Returns std::nullopt on unpaired surrogates.
-std::optional<std::string> utf16_to_utf8(std::u16string_view text);
+WJSON_API std::optional<std::string> utf16_to_utf8(std::u16string_view text);
 
 // Computes the 1-based line and column (in code points) of a byte offset.
-std::pair<std::size_t, std::size_t> line_and_column(std::string_view text, std::size_t offset) noexcept;
+WJSON_API std::pair<std::size_t, std::size_t> line_and_column(std::string_view text, std::size_t offset) noexcept;
 
 // ---------------------------------------------------------------------------
 // Serialization
@@ -244,6 +246,6 @@ struct WriteOptions {
     bool ascii_only = false;
 };
 
-std::string serialize(const Value& value, const WriteOptions& options = {});
+WJSON_API std::string serialize(const Value& value, const WriteOptions& options = {});
 
 }  // namespace wjson

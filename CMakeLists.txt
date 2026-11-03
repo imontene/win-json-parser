@@ -18,11 +18,23 @@ include(cmake/CompilerOptions.cmake)
 # bindings are thin front-ends over the same code.
 # ---------------------------------------------------------------------------
 set(WJSON_SOURCES
+    src/c_api.cpp
     src/encoding.cpp
     src/parser.cpp
     src/value.cpp
     src/writer.cpp
 )
+
+# Static by default; -DBUILD_SHARED_LIBS=ON builds wjson.dll / libwjson.so.
+# The generated export.h records the choice so installed headers match.
+if(BUILD_SHARED_LIBS)
+    set(WJSON_SHARED_LIBRARY 1)
+else()
+    set(WJSON_SHARED_LIBRARY 0)
+endif()
+set(WJSON_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
+configure_file(cmake/export.h.in "${WJSON_GENERATED_INCLUDE_DIR}/wjson/export.h" @ONLY)
+
 # The library uses the default MSVC runtime (/MD), which is what consuming
 # projects and package managers expect.
 add_library(wjson ${WJSON_SOURCES})
@@ -30,12 +42,20 @@ add_library(wjson::wjson ALIAS wjson)
 target_include_directories(wjson
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${WJSON_GENERATED_INCLUDE_DIR}>
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_compile_features(wjson PUBLIC cxx_std_17)
-set_target_properties(wjson PROPERTIES CXX_EXTENSIONS OFF)
+target_compile_definitions(wjson PRIVATE WJSON_BUILDING WJSON_VERSION="${PROJECT_VERSION}")
+set_target_properties(wjson PROPERTIES
+    CXX_EXTENSIONS OFF
+    # Only symbols marked WJSON_API are exported from a shared library.
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR})
 wjson_set_compiler_options(wjson)
 
 # ---------------------------------------------------------------------------
@@ -51,8 +71,9 @@ if(WJSON_BUILD_CLI)
         # vcpkg, takes precedence.)
         target_sources(wjson_cli PRIVATE ${WJSON_SOURCES})
         target_include_directories(wjson_cli PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
+            ${CMAKE_CURRENT_SOURCE_DIR}/include ${WJSON_GENERATED_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_features(wjson_cli PRIVATE cxx_std_17)
+        target_compile_definitions(wjson_cli PRIVATE WJSON_STATIC_DEFINE)
         set_target_properties(wjson_cli PROPERTIES
             MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     else()
@@ -88,6 +109,10 @@ if(WJSON_INSTALL)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
     install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(FILES "${WJSON_GENERATED_INCLUDE_DIR}/wjson/export.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/wjson)
+    if(MSVC AND BUILD_SHARED_LIBS)
+        install(FILES $<TARGET_PDB_FILE:wjson> DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
+    endif()
     install(EXPORT wjsonTargets NAMESPACE wjson:: DESTINATION ${WJSON_CMAKE_DIR})
 
     configure_package_config_file(cmake/wjsonConfig.cmake.in

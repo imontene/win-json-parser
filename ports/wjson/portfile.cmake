@@ -9,9 +9,6 @@
 #       HEAD_REF main)
 get_filename_component(SOURCE_PATH "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 
-# The library does not export symbols for a DLL yet.
-vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
-
 vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
     FEATURES
         tool WJSON_BUILD_CLI
@@ -26,6 +23,7 @@ vcpkg_cmake_configure(
         -DWJSON_INSTALL=ON
 )
 vcpkg_cmake_install()
+vcpkg_copy_pdbs()
 vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/wjson)
 
 if("tool" IN_LIST FEATURES)
