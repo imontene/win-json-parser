@@ -16,6 +16,11 @@ function(wjson_set_compiler_options target)
         endif()
         if(WJSON_WARNINGS_AS_ERRORS)
             target_compile_options(${target} PRIVATE -Werror)
+            if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+                # GCC 15 reports false positives inside std::variant at -O3; keep
+                # them visible as warnings without failing the build.
+                target_compile_options(${target} PRIVATE -Wno-error=maybe-uninitialized)
+            endif()
         endif()
         if(WJSON_SANITIZE)
             target_compile_options(${target} PRIVATE

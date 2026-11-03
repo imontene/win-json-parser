@@ -11,24 +11,21 @@ option(WJSON_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(WJSON_SANITIZE "Build with AddressSanitizer and UBSan (GCC/Clang)" OFF)
 option(WJSON_INSTALL "Generate install rules and the CMake package" ${PROJECT_IS_TOP_LEVEL})
 
-# Ship a self-contained wjson.exe: link the MSVC runtime statically, unless the
-# parent project (when consumed via add_subdirectory) has decided otherwise.
-if(PROJECT_IS_TOP_LEVEL AND NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
-
 include(cmake/CompilerOptions.cmake)
 
 # ---------------------------------------------------------------------------
 # Library: all JSON logic lives here so that the CLI, a future GUI and language
 # bindings are thin front-ends over the same code.
 # ---------------------------------------------------------------------------
-add_library(wjson
+set(WJSON_SOURCES
     src/encoding.cpp
     src/parser.cpp
     src/value.cpp
     src/writer.cpp
 )
+# The library uses the default MSVC runtime (/MD), which is what consuming
+# projects and package managers expect.
+add_library(wjson ${WJSON_SOURCES})
 add_library(wjson::wjson ALIAS wjson)
 target_include_directories(wjson
     PUBLIC
@@ -47,7 +44,20 @@ wjson_set_compiler_options(wjson)
 if(WJSON_BUILD_CLI)
     add_executable(wjson_cli cli/main.cpp)
     set_target_properties(wjson_cli PROPERTIES OUTPUT_NAME wjson CXX_EXTENSIONS OFF)
-    target_link_libraries(wjson_cli PRIVATE wjson::wjson)
+    if(MSVC AND NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
+        # Self-contained wjson.exe: static MSVC runtime. The library sources are
+        # compiled into the executable because a /MD library cannot be linked
+        # into a /MT program. (A toolchain that picks the runtime, such as
+        # vcpkg, takes precedence.)
+        target_sources(wjson_cli PRIVATE ${WJSON_SOURCES})
+        target_include_directories(wjson_cli PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_features(wjson_cli PRIVATE cxx_std_17)
+        set_target_properties(wjson_cli PROPERTIES
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    else()
+        target_link_libraries(wjson_cli PRIVATE wjson::wjson)
+    endif()
     target_compile_definitions(wjson_cli PRIVATE WJSON_VERSION="${PROJECT_VERSION}")
     wjson_set_compiler_options(wjson_cli)
     if(MINGW)

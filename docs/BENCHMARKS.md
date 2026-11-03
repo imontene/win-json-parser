@@ -34,6 +34,16 @@ Añade `--markdown` para obtener una tabla y `--min-time N` para cambiar los seg
 
 El job `benchmark` del CI publica la tabla en el resumen de cada ejecución en `main` (pestaña *Actions* → ejecución → *Summary*). Al ser máquinas compartidas, conviene comparar tendencias, no cifras sueltas.
 
+### Windows, MSVC x64 Release (runner `windows-latest` de GitHub, v0.5.0)
+
+| File | Size (MB) | DOM parse (MB/s) | SAX parse (MB/s) | SAX stream (MB/s) | Serialize (MB/s) |
+|---|---:|---:|---:|---:|---:|
+| canada.json | 2.25 | 61 | 88 | 65 | 238 |
+| citm_catalog.json | 1.73 | 276 | 657 | 228 | 1394 |
+| twitter.json | 0.63 | 181 | 362 | 192 | 486 |
+
+`canada.json` es mucho más lento con MSVC que con GCC (88 frente a 348 MB/s en SAX). Casi todo el archivo son números en coma flotante, y la conversión `std::from_chars` de MSVC es el cuello de botella. Es la primera optimización candidata (por ejemplo, con el algoritmo de [fast_float](https://github.com/fastfloat/fast_float)).
+
 ### Linux, GCC 13, `-O3` (contenedor de desarrollo, v0.5.0)
 
 | File | Size (MB) | DOM parse (MB/s) | SAX parse (MB/s) | SAX stream (MB/s) | Serialize (MB/s) |
@@ -56,4 +66,5 @@ El streaming mantiene la memoria constante sea cual sea el tamaño del archivo. 
 ## Próximos pasos
 
 - Comparar con otras bibliotecas (RapidJSON, nlohmann/json, simdjson) en el mismo job.
+- Conversión de números más rápida en MSVC (ver `canada.json` arriba).
 - Optimizaciones previstas: strings sin copias (*zero-copy*), asignador *arena* para el DOM y SIMD para saltar espacios y buscar comillas.

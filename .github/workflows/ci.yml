@@ -145,9 +145,12 @@ jobs:
       - name: Build consumer project
         shell: pwsh
         run: |
+          # A static triplet also uses the static MSVC runtime, so the consumer must too.
+          $runtime = if ("${{ matrix.triplet }}" -like "*-static") { 'MultiThreaded$<$<CONFIG:Debug>:Debug>' } else { 'MultiThreaded$<$<CONFIG:Debug>:Debug>DLL' }
           cmake -S tests/package -B build/vcpkg-consumer `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY="$runtime"
           if ($LASTEXITCODE -ne 0) { exit 1 }
           cmake --build build/vcpkg-consumer --config Release
           if ($LASTEXITCODE -ne 0) { exit 1 }
