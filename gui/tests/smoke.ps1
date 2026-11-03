@@ -41,6 +41,9 @@ function Save-Screenshot([string] $Name) {
 
 $env:WJSON_VIEWER_LOG = Join-Path $OutputDir 'viewer.log'
 
+$priFiles = Get-ChildItem (Split-Path $Exe) -Filter *.pri
+Write-Host "PRI files next to the viewer: $(if ($priFiles) { ($priFiles.Name -join ', ') } else { 'none' })"
+
 function Write-Diagnostics {
     if (Test-Path $env:WJSON_VIEWER_LOG) {
         Write-Host '--- viewer.log'
