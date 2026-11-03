@@ -2,11 +2,15 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). El proyecto sigue [versionado semántico](https://semver.org/lang/es/): a partir de 1.0.0, la API pública (C++ y C) solo cambia de forma incompatible en una nueva versión mayor.
 
-## [Sin publicar]
+## [1.1.0] - 2026-11-03
 
 ### Añadido
 - **wjson Viewer**: aplicación de escritorio para Windows (WinUI 3, sin instalación) con editor, validación en vivo, ir al error, árbol coloreado y perezoso, búsqueda con JSON Pointer, formatear y minificar, JSONC (automático con `.jsonc`), conservación de codificación y finales de línea, modo streaming para archivos grandes e interfaz en español e inglés (`--lang`).
 - Las releases incluyen `wjson-viewer-<versión>-windows-{x64,x86,arm64}.zip`.
+- Flujo `publish.yml` para publicar en NuGet y PowerShell Gallery los paquetes de una release ya existente.
+
+### Corregido
+- El flujo de release no publicaba en NuGet ni en la PowerShell Gallery: las claves no llegaban a la condición de cada paso, y `dotnet nuget push` no encontraba el paquete en Windows.
 
 ## [1.0.0] - 2026-11-03
 

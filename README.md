@@ -4,7 +4,7 @@
 
 Parser de JSON rápido, robusto y conforme a estándares, escrito en C++17 y diseñado para Windows.
 
-> Versión [1.0.0](https://github.com/imontene/win-json-parser/releases/tag/v1.0.0). Las APIs de C++ y C siguen [versionado semántico](CHANGELOG.md).
+> Versión [1.1.0](https://github.com/imontene/win-json-parser/releases/latest). Las APIs de C++ y C siguen [versionado semántico](CHANGELOG.md).
 
 ## Características
 
@@ -37,7 +37,7 @@ Aplicación de escritorio para Windows 10 y 11 (WinUI 3):
 - Los archivos de más de 8 MB se abren en solo lectura y se validan en streaming.
 - Abrir, guardar y arrastrar archivos. Interfaz en español o inglés, según Windows.
 
-No necesita instalación: descomprime `wjson-viewer-<versión>-windows-<arquitectura>.zip` y ejecuta `WjsonViewer.exe`. Se incluirá en las releases a partir de la próxima versión; mientras tanto, cada ejecución del flujo **GUI** en *Actions* genera el zip para x64. Desde la línea de comandos:
+No necesita instalación: descarga `wjson-viewer-<versión>-windows-<arquitectura>.zip` de la [última release](https://github.com/imontene/win-json-parser/releases/latest), descomprímelo y ejecuta `WjsonViewer.exe`. Desde la línea de comandos:
 
 ```powershell
 WjsonViewer.exe datos.json --pointer /usuarios/0 --lang es
@@ -172,7 +172,7 @@ Install-Module Wjson                       # PowerShell (PowerShell Gallery)
 dotnet add package Imontene.Wjson          # .NET (NuGet)
 ```
 
-El CLI `wjson.exe` se descarga desde la [release 1.0.0](https://github.com/imontene/win-json-parser/releases/tag/v1.0.0) (x64, x86 y ARM64). La instalación con `winget install imontene.wjson` estará disponible cuando se acepten sus manifiestos en winget-pkgs.
+El CLI `wjson.exe` y wjson Viewer se descargan desde la [última release](https://github.com/imontene/win-json-parser/releases/latest) (x64, x86 y ARM64). La instalación con `winget install imontene.wjson` estará disponible cuando se acepten sus manifiestos en winget-pkgs.
 
 ### vcpkg
 

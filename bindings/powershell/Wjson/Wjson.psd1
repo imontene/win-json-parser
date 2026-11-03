@@ -1,6 +1,6 @@
 @{
     RootModule           = 'Wjson.psm1'
-    ModuleVersion        = '1.0.0'
+    ModuleVersion        = '1.1.0'
     GUID                 = '2ad89558-8b93-4eb0-b990-0c9eebed6a36'
     Author               = 'imontene'
     Copyright            = '(c) 2026 imontene and win-json-parser contributors. MIT License.'
