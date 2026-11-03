@@ -1,0 +1,93 @@
+name: Fuzz
+
+# Short run on every push and pull request; longer run every night. The corpus
+# is cached between runs so coverage keeps growing over time.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Fuzzing time in seconds"
+        default: "600"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JSON_TEST_SUITE_REF: 1ef36fa01286573e846ac449e8683f8833c5b26a
+
+jobs:
+  libfuzzer:
+    name: libFuzzer + ASan/UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Build fuzz target
+        run: |
+          cmake -S . -B build/fuzz -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ \
+            -DWJSON_BUILD_FUZZERS=ON -DWJSON_BUILD_TESTS=OFF -DWJSON_BUILD_CLI=OFF
+          grep -q "WJSON_HAVE_LIBFUZZER:INTERNAL=1" build/fuzz/CMakeCache.txt || { echo "libFuzzer not found"; exit 1; }
+          cmake --build build/fuzz --target wjson_fuzz
+
+      - name: Restore corpus
+        uses: actions/cache/restore@v6
+        with:
+          path: fuzz-corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: fuzz-corpus-
+
+      - name: Checkout JSONTestSuite (seeds)
+        uses: actions/checkout@v6
+        with:
+          repository: nst/JSONTestSuite
+          ref: ${{ env.JSON_TEST_SUITE_REF }}
+          path: JSONTestSuite
+
+      - name: Fuzz
+        run: |
+          mkdir -p fuzz-corpus seeds artifacts
+          cp JSONTestSuite/test_parsing/*.json tests/data/* seeds/
+          case "${{ github.event_name }}" in
+            schedule) seconds=1800 ;;
+            workflow_dispatch) seconds="${{ github.event.inputs.seconds }}" ;;
+            *) seconds=120 ;;
+          esac
+          echo "Fuzzing for ${seconds}s"
+          build/fuzz/fuzz/wjson_fuzz fuzz-corpus seeds \
+            -dict=fuzz/json.dict -max_total_time="$seconds" -max_len=65536 \
+            -rss_limit_mb=2048 -timeout=10 -artifact_prefix=artifacts/ -print_final_stats=1
+
+      - name: Minimize corpus
+        if: success()
+        run: |
+          mkdir -p corpus-min
+          build/fuzz/fuzz/wjson_fuzz -merge=1 corpus-min fuzz-corpus
+          rm -rf fuzz-corpus && mv corpus-min fuzz-corpus
+          echo "Corpus: $(ls fuzz-corpus | wc -l) inputs"
+
+      - name: Save corpus
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: fuzz-corpus
+          key: fuzz-corpus-${{ github.run_id }}
+
+      - name: Upload crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fuzz-artifacts
+          path: artifacts/
+          if-no-files-found: ignore

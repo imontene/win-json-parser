@@ -134,6 +134,11 @@ endif()
 # ---------------------------------------------------------------------------
 # Benchmarks (off by default; see scripts/fetch_benchmark_data.py)
 # ---------------------------------------------------------------------------
+option(WJSON_BUILD_FUZZERS "Build the wjson_fuzz fuzz target (see fuzz/)" OFF)
+if(WJSON_BUILD_FUZZERS)
+    add_subdirectory(fuzz)
+endif()
+
 option(WJSON_BUILD_BENCHMARKS "Build the wjson_bench benchmark" OFF)
 if(WJSON_BUILD_BENCHMARKS)
     add_executable(wjson_bench bench/bench.cpp)
