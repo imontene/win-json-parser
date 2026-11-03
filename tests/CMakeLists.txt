@@ -29,6 +29,8 @@ add_executable(wjson_tests
     main.cpp
     test_encoding.cpp
     test_parser.cpp
+    test_pointer.cpp
+    test_streaming.cpp
     test_writer.cpp
 )
 target_link_libraries(wjson_tests PRIVATE wjson::wjson)
@@ -47,4 +49,17 @@ if(WJSON_BUILD_CLI)
     set_tests_properties(cli.validate_invalid PROPERTIES WILL_FAIL TRUE)
     add_test(NAME cli.format COMMAND wjson_cli format ${CMAKE_CURRENT_SOURCE_DIR}/data/valid.json)
     add_test(NAME cli.version COMMAND wjson_cli --version)
+
+    add_test(NAME cli.query
+             COMMAND wjson_cli query --raw /nombre ${CMAKE_CURRENT_SOURCE_DIR}/data/valid.json)
+    set_tests_properties(cli.query PROPERTIES PASS_REGULAR_EXPRESSION "^Iv")
+    add_test(NAME cli.query_missing
+             COMMAND wjson_cli query /nope ${CMAKE_CURRENT_SOURCE_DIR}/data/valid.json)
+    set_tests_properties(cli.query_missing PROPERTIES WILL_FAIL TRUE)
+
+    add_test(NAME cli.jsonc_strict
+             COMMAND wjson_cli validate ${CMAKE_CURRENT_SOURCE_DIR}/data/settings.jsonc)
+    set_tests_properties(cli.jsonc_strict PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME cli.jsonc
+             COMMAND wjson_cli validate --jsonc ${CMAKE_CURRENT_SOURCE_DIR}/data/settings.jsonc)
 endif()

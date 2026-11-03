@@ -1,0 +1,5 @@
+// Ejemplo de JSONC (comentarios y comas finales)
+{
+  "editor.fontSize": 14, /* tamaño */
+  "files.exclude": ["build", "out",],
+}
