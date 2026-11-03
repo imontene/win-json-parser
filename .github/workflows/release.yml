@@ -1,0 +1,197 @@
+name: Release
+
+# Pushing a tag vX.Y.Z builds every release asset and publishes a GitHub
+# release. Running it by hand (workflow_dispatch) is a dry run: everything is
+# built and uploaded as a workflow artifact, nothing is published.
+#
+# Optional repository secrets:
+#   NUGET_API_KEY      publish Imontene.Wjson to nuget.org
+#   PSGALLERY_API_KEY  publish the Wjson module to the PowerShell Gallery
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: v
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            expected="${GITHUB_REF_NAME#v}"
+            python3 scripts/check_versions.py "$expected"
+          else
+            python3 scripts/check_versions.py
+          fi
+          echo "version=$(python3 scripts/check_versions.py | tail -1)" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows ${{ matrix.arch }}
+    needs: version
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - { arch: x64, cmake_arch: x64, rid: win-x64, test: true }
+          - { arch: x86, cmake_arch: Win32, rid: win-x86, test: true }
+          - { arch: arm64, cmake_arch: ARM64, rid: win-arm64, test: false }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build wjson.exe (static runtime)
+        run: |
+          cmake -S . -B build/cli -A ${{ matrix.cmake_arch }} -DWJSON_BUILD_TESTS=${{ matrix.test && 'ON' || 'OFF' }}
+          cmake --build build/cli --config Release --parallel
+
+      - name: Test
+        if: matrix.test
+        run: ctest --test-dir build/cli -C Release --output-on-failure
+
+      - name: Build wjson.dll (static runtime, no VC++ redistributable needed)
+        run: |
+          cmake -S . -B build/dll -A ${{ matrix.cmake_arch }} -DBUILD_SHARED_LIBS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DWJSON_BUILD_TESTS=OFF -DWJSON_BUILD_CLI=OFF
+          cmake --build build/dll --config Release --parallel
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $zipDir = "stage/wjson-$env:VERSION-windows-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force $zipDir, "dist", "native/${{ matrix.rid }}/native" | Out-Null
+          Copy-Item build/cli/Release/wjson.exe, LICENSE, README.md $zipDir
+          Compress-Archive -Path "$zipDir/*" -DestinationPath "dist/wjson-$env:VERSION-windows-${{ matrix.arch }}.zip"
+          Copy-Item build/dll/Release/wjson.dll "native/${{ matrix.rid }}/native/"
+          Copy-Item build/dll/Release/wjson.pdb "native/${{ matrix.rid }}/native/" -ErrorAction SilentlyContinue
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: cli-${{ matrix.arch }}
+          path: dist/*.zip
+      - uses: actions/upload-artifact@v6
+        with:
+          name: native-${{ matrix.rid }}
+          path: native/
+
+  linux:
+    name: Linux x64 (libwjson.so)
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DWJSON_BUILD_TESTS=OFF -DWJSON_BUILD_CLI=OFF
+          cmake --build build --parallel
+          mkdir -p native/linux-x64/native
+          cp -L build/libwjson.so native/linux-x64/native/libwjson.so
+      - uses: actions/upload-artifact@v6
+        with:
+          name: native-linux-x64
+          path: native/
+
+  package:
+    name: NuGet, PowerShell module and winget manifests
+    needs: [version, windows, linux]
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: native-*
+          path: native
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: cli-*
+          path: dist
+          merge-multiple: true
+
+      - name: NuGet package
+        run: dotnet pack bindings/dotnet/src/Wjson -c Release -o dist "-p:WjsonNativeRoot=${{ github.workspace }}/native"
+
+      - name: PowerShell module
+        shell: pwsh
+        run: |
+          # The module ships only the Windows runtimes.
+          $nativeWindows = 'native-windows'
+          New-Item -ItemType Directory -Force $nativeWindows | Out-Null
+          Get-ChildItem native -Directory -Filter 'win-*' | Copy-Item -Destination $nativeWindows -Recurse
+          ./bindings/powershell/build.ps1 -NativeRoot $nativeWindows -OutputPath out/Wjson
+          Compress-Archive -Path out/Wjson -DestinationPath "dist/Wjson-powershell-$env:VERSION.zip"
+
+      - name: winget manifests
+        shell: pwsh
+        run: |
+          $base = "https://github.com/${{ github.repository }}/releases/download/v$env:VERSION"
+          $installers = 'x64', 'x86', 'arm64' | ForEach-Object {
+            $zip = "wjson-$env:VERSION-windows-$_.zip"
+            '--installer'; "$_=$base/$zip=dist/$zip"
+          }
+          python scripts/make_winget_manifests.py --version $env:VERSION --output winget @installers
+          Compress-Archive -Path winget/manifests -DestinationPath "dist/winget-manifests-$env:VERSION.zip"
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -File | Where-Object Name -ne 'SHA256SUMS.txt' | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          Get-Content dist/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-${{ env.VERSION }}
+          path: dist/
+
+  publish:
+    name: Publish
+    if: github.ref_type == 'tag'
+    needs: [version, package]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: release-${{ env.VERSION }}
+          path: dist
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $notes = "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/v$env:VERSION/CHANGELOG.md)."
+          gh release create "v$env:VERSION" (Get-ChildItem dist -File).FullName --title "wjson $env:VERSION" --notes $notes --verify-tag
+
+      - name: Publish to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        if: env.NUGET_API_KEY != ''
+        run: dotnet nuget push "dist/*.nupkg" --api-key "$env:NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Publish to the PowerShell Gallery
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        if: env.PSGALLERY_API_KEY != ''
+        shell: pwsh
+        run: |
+          Expand-Archive "dist/Wjson-powershell-$env:VERSION.zip" -DestinationPath module
+          Publish-Module -Path module/Wjson -NuGetApiKey $env:PSGALLERY_API_KEY

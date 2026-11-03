@@ -7,7 +7,7 @@ Set-StrictMode -Version 3.0
 
 $useNet8 = $PSVersionTable.PSEdition -eq 'Core' -and [Environment]::Version.Major -ge 8
 $framework = if ($useNet8) { 'net8.0' } else { 'netstandard2.0' }
-$assemblyPath = Join-Path $PSScriptRoot "lib/$framework/Wjson.dll"
+$assemblyPath = Join-Path $PSScriptRoot "lib/$framework/Imontene.Wjson.dll"
 Add-Type -Path $assemblyPath
 
 $isWindowsOS = $PSVersionTable.PSEdition -eq 'Desktop' -or $IsWindows

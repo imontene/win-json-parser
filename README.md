@@ -4,7 +4,7 @@
 
 Parser de JSON rápido, robusto y conforme a estándares, escrito en C++17 y diseñado para Windows.
 
-> 🚧 Proyecto en desarrollo (v0.5.0). La API puede cambiar hasta la versión 1.0.
+> Versión 1.0.0 (pendiente de publicar). Las APIs de C++ y C siguen [versionado semántico](CHANGELOG.md).
 
 ## Características
 
@@ -17,6 +17,8 @@ Parser de JSON rápido, robusto y conforme a estándares, escrito en C++17 y dis
 - **Límites de seguridad** configurables (profundidad, longitud de strings y tamaño del documento) frente a entradas maliciosas.
 - Serialización compacta o formateada, con opción de escapar todo lo que no sea ASCII.
 - Herramienta de línea de comandos `wjson.exe` en un único ejecutable, sin dependencias.
+- Disponible desde **C++**, **C** (ABI estable, `wjson.dll`), **.NET** (NuGet) y **PowerShell** (módulo `Wjson`).
+- Probado con JSONTestSuite, sanitizers y **fuzzing continuo**.
 
 Consulta la hoja de ruta en [docs/FEATURES.md](docs/FEATURES.md), el diseño en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) y el rendimiento en [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
@@ -85,6 +87,24 @@ if (error.ok()) std::printf("%zu objetos\n", counter.objects);
 
 Un `wjson::Handler` sin modificar sirve como validador. También están `wjson::parse_stream(std::istream&, ...)` y `wjson::parse(texto, handler)`.
 
+### API en C
+
+Para C o para crear bindings desde otros lenguajes, `wjson/wjson.h` ofrece una ABI estable sin excepciones:
+
+```c
+#include <wjson/wjson.h>
+
+wjson_error error;
+wjson_document* doc = wjson_parse(text, WJSON_NUL_TERMINATED, NULL, &error);
+if (!doc) {
+    printf("%zu:%zu: %s\n", error.line, error.column, wjson_error_message(error.code));
+    return 1;
+}
+const wjson_value* name = wjson_value_at_pointer(wjson_document_root(doc), "/usuario/nombre", WJSON_NUL_TERMINATED);
+printf("%s\n", wjson_value_get_string(name, NULL));
+wjson_document_free(doc);
+```
+
 ### Opciones
 
 ```cpp
@@ -95,7 +115,46 @@ options.max_document_size = 100 << 20;      // 100 MiB por documento
 auto result = wjson::parse(texto, options);
 ```
 
+## .NET
+
+```csharp
+using Wjson;
+
+var settings = (JsonObject)WJson.ParseFile("settings.json", ParseOptions.Jsonc)!;
+Console.WriteLine(settings["editor.fontSize"]);
+
+if (!WJson.TryValidateFile("enorme.json", out var error))
+    Console.WriteLine($"{error!.Line}:{error.Column}: {error.Message}");
+
+string bonito = WJson.Format("{\"a\":[1,2]}", indent: 4);
+```
+
+Paquete NuGet `Imontene.Wjson` (`netstandard2.0` y `net8.0`), con binarios nativos para win-x64, win-x86, win-arm64 y linux-x64.
+
+## PowerShell
+
+```powershell
+Import-Module Wjson
+
+Test-WJson -Path .\config.json -Detailed          # Valid, Line, Column, Message...
+$s = ConvertFrom-WJson -Path "$env:APPDATA\Code\User\settings.json" -Jsonc
+Get-Content data.json -Raw | Format-WJson -Indent 4
+Get-WJsonValue /dependencies/0/name -Path .\package.json
+```
+
+Funciona en Windows PowerShell 5.1 y en PowerShell 7. A diferencia de `ConvertFrom-Json`, indica la línea y la columna de cada error, acepta JSONC, lee archivos UTF-16 y valida archivos de cualquier tamaño en streaming.
+
 ## Instalación
+
+Cuando se publique la versión 1.0.0 (ver [docs/RELEASING.md](docs/RELEASING.md)):
+
+```powershell
+winget install imontene.wjson              # CLI
+Install-Module Wjson                       # PowerShell
+dotnet add package Imontene.Wjson          # .NET
+```
+
+Mientras tanto, cada ejecución del CI genera estos artefactos para descargar.
 
 ### vcpkg
 
@@ -127,7 +186,7 @@ cmake --build build/msvc-x64 --config Release
 ctest --test-dir build/msvc-x64 -C Release --output-on-failure
 ```
 
-Otros presets: `msvc-x86`, `msvc-arm64`, `clang-cl-x64`, `linux-gcc` y `linux-clang-sanitize`. También puedes abrir la carpeta directamente con Visual Studio, que detecta `CMakePresets.json`.
+Otros presets: `msvc-x86`, `msvc-arm64`, `clang-cl-x64`, `linux-gcc` y `linux-clang-sanitize`. Añade `-DBUILD_SHARED_LIBS=ON` para compilar `wjson.dll`. También puedes abrir la carpeta directamente con Visual Studio, que detecta `CMakePresets.json`.
 
 Los tests descargan [doctest](https://github.com/doctest/doctest) (una sola cabecera, con hash verificado) al configurar. Para compilar sin conexión, pasa `-DWJSON_DOCTEST_INCLUDE_DIR=<carpeta>` o desactiva los tests con `-DWJSON_BUILD_TESTS=OFF`.
 
@@ -138,7 +197,7 @@ git clone https://github.com/nst/JSONTestSuite
 python scripts/run_jsontestsuite.py build/msvc-x64/Release/wjson.exe JSONTestSuite/test_parsing
 ```
 
-Para los benchmarks, consulta [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+Para los benchmarks, consulta [docs/BENCHMARKS.md](docs/BENCHMARKS.md). El fuzzer está en [`fuzz/`](fuzz/fuzz_parse.cpp): en CI se ejecuta 2 minutos con cada cambio y 30 minutos cada noche, y conserva el corpus entre ejecuciones.
 
 ## Licencia
 

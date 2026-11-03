@@ -27,7 +27,7 @@ Copy-Item (Join-Path $PSScriptRoot 'Wjson/Wjson.psd1'), (Join-Path $PSScriptRoot
 Copy-Item (Join-Path $PSScriptRoot '../../LICENSE') $OutputPath
 
 foreach ($framework in 'netstandard2.0', 'net8.0') {
-    $source = Join-Path $PSScriptRoot "../dotnet/src/Wjson/bin/$Configuration/$framework/Wjson.dll"
+    $source = Join-Path $PSScriptRoot "../dotnet/src/Wjson/bin/$Configuration/$framework/Imontene.Wjson.dll"
     $target = Join-Path $OutputPath "lib/$framework"
     New-Item -ItemType Directory -Path $target -Force | Out-Null
     Copy-Item $source $target

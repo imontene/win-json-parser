@@ -15,7 +15,7 @@ Toda la lógica JSON vive en la biblioteca `wjson`. Las interfaces de usuario (l
           ┌─────────────────────┼──────────────────────┬───────────────────┐
           │                     │                      │                   │
    ┌──────▼──────┐    ┌─────────▼────────┐   ┌─────────▼────────┐  ┌───────▼───────┐
-   │ wjson.exe   │    │ GUI (futuro)     │   │ Bindings .NET /  │  │ Tu aplicación │
+   │ wjson.exe   │    │ GUI (futuro)     │   │ API C → .NET →   │  │ Tu aplicación │
    │ (cli/)      │    │ (gui/)           │   │ PowerShell       │  │ (vcpkg/NuGet) │
    └─────────────┘    └──────────────────┘   └──────────────────┘  └───────────────┘
 ```
@@ -24,11 +24,15 @@ Toda la lógica JSON vive en la biblioteca `wjson`. Las interfaces de usuario (l
 
 | Ruta | Contenido |
 |---|---|
-| `include/wjson/wjson.hpp` | API pública (única cabecera que incluyen los usuarios). |
+| `include/wjson/wjson.hpp` | API pública en C++. |
+| `include/wjson/wjson.h` | API pública en C, con ABI estable (base de los bindings). |
 | `src/` | Implementación (ver abajo). |
 | `cli/` | Herramienta `wjson.exe` (`validate`, `format`, `minify`, `query`). |
 | `tests/` | Tests unitarios (doctest), datos de prueba y `tests/package/` (proyecto que consume el paquete instalado). |
 | `bench/` | Benchmark de rendimiento `wjson_bench`. |
+| `fuzz/` | Objetivo de fuzzing (libFuzzer) y driver para reproducir entradas. |
+| `bindings/dotnet/` | Binding .NET (P/Invoke sobre la API en C) y sus tests. |
+| `bindings/powershell/` | Módulo de PowerShell `Wjson` y sus tests (Pester). |
 | `ports/wjson/` | Port *overlay* de vcpkg. |
 | `scripts/` | Ejecutor de JSONTestSuite y descarga de los datos de benchmark. |
 | `cmake/` | Opciones de compilador y plantilla del paquete CMake. |
@@ -78,3 +82,14 @@ Así, cualquier cambio en la gramática (por ejemplo, JSON5) se aplica a la vez 
 3. Funcionalidades típicas de la GUI: vista en árbol, editor con resaltado y errores en vivo, formatear y minificar, búsqueda con JSON Pointer, comparación de dos archivos y apertura de archivos grandes.
 
 La GUI se apoyará en features que ya están en la hoja de ruta ([FEATURES.md](FEATURES.md)): el **parser en streaming** e **incremental** para archivos de varios GB sin bloquear la interfaz, y callbacks de **progreso y cancelación**.
+
+## Capas para otros lenguajes
+
+```
+ PowerShell (Wjson.psm1)  →  .NET (Imontene.Wjson.dll, P/Invoke)  →  API en C (wjson.dll)  →  núcleo C++
+```
+
+- La **API en C** (`src/c_api.cpp`) es la única frontera binaria estable. No deja pasar excepciones, todo el texto es UTF-8 y las estructuras de opciones llevan su propio tamaño (`struct_size`), así que se pueden añadir campos sin romper programas ya compilados.
+- La **DLL** exporta solo los símbolos marcados con `WJSON_API`; el resto queda oculto (`-fvisibility=hidden` en GCC/Clang).
+- El binding de **.NET** busca la biblioteca nativa en `runtimes/<rid>/native/` junto al ensamblado (la estructura de NuGet) o en la ruta indicada en `WJson.NativeLibraryPath`. El ensamblado se llama `Imontene.Wjson.dll` y no `Wjson.dll` porque en Windows chocaría con `wjson.dll`, al no distinguir el sistema de archivos mayúsculas de minúsculas.
+- El módulo de **PowerShell** carga el ensamblado `net8.0` en PowerShell 7 y el `netstandard2.0` en Windows PowerShell 5.1.

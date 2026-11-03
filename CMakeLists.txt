@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(wjson
-    VERSION 0.5.0
+    VERSION 1.0.0
     DESCRIPTION "Strict, fast JSON parser for Windows"
     LANGUAGES CXX)
 
@@ -55,7 +55,9 @@ set_target_properties(wjson PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
     VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR})
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    # wjson.exe lands in the same folder and owns wjson.pdb.
+    COMPILE_PDB_NAME wjson_lib)
 wjson_set_compiler_options(wjson)
 
 # ---------------------------------------------------------------------------
@@ -118,9 +120,9 @@ if(WJSON_INSTALL)
     configure_package_config_file(cmake/wjsonConfig.cmake.in
         "${CMAKE_CURRENT_BINARY_DIR}/wjsonConfig.cmake"
         INSTALL_DESTINATION ${WJSON_CMAKE_DIR})
-    # Before 1.0, a new minor version may break the API.
+    # Semantic versioning: any 1.x release is compatible with 1.0.
     write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/wjsonConfigVersion.cmake"
-        COMPATIBILITY SameMinorVersion)
+        COMPATIBILITY SameMajorVersion)
     install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/wjsonConfig.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/wjsonConfigVersion.cmake"

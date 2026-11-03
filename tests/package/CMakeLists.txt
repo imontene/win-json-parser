@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.21)
 project(wjson_package_test LANGUAGES CXX)
 
-find_package(wjson 0.5 CONFIG REQUIRED)
+find_package(wjson 1.0 CONFIG REQUIRED)
 
 add_executable(package_test main.cpp)
 target_link_libraries(package_test PRIVATE wjson::wjson)

@@ -43,9 +43,9 @@ Es lo que diferenciaría el proyecto de un parser genérico.
 | ◐ Soporte de `wchar_t` / `std::wstring` / `LPCWSTR` | 🟢 | Entrada y salida nativa en UTF-16, que es la codificación de las APIs de Windows. *Hecho: archivos y streams UTF-16, `utf16_to_utf8()`. Pendiente: sobrecargas con `std::wstring_view`.* |
 | ◐ Rutas largas y Unicode | 🟢 | Abrir archivos con `CreateFileW`, soporte para rutas `\\?\` de más de 260 caracteres. *Hecho: nombres de archivo Unicode. Pendiente: probar rutas largas.* |
 | ✅ Compatibilidad con MSVC, clang-cl y MinGW | 🟢 | Arquitecturas x64, x86 y **ARM64** (Windows on ARM). |
-| ◐ Distribución en **vcpkg** y **NuGet** | 🟡 | Biblioteca estática y DLL, con símbolos (`.pdb`). *Hecho: port de vcpkg (overlay en `ports/wjson`, solo estática) y paquete CMake. Pendiente: registro oficial de vcpkg, DLL y NuGet.* |
-| Bindings para **.NET** (C#) | 🟡 | P/Invoke o C++/CLI. |
-| Módulo de **PowerShell** | 🟡 | Cmdlets tipo `ConvertFrom-FastJson`, más rápido y con mejores errores que `ConvertFrom-Json`. |
+| ◐ Distribución en **vcpkg** y **NuGet** | 🟡 | Biblioteca estática y DLL, con símbolos (`.pdb`). *Hecho: DLL, paquete CMake, port de vcpkg (overlay) y paquete NuGet generado en cada release. Pendiente: publicarlos en nuget.org y en el registro oficial de vcpkg.* |
+| ✅ Bindings para **.NET** (C#) | 🟡 | P/Invoke o C++/CLI. *Hecho: P/Invoke sobre la API en C, `netstandard2.0` y `net8.0`.* |
+| ✅ Módulo de **PowerShell** | 🟡 | Cmdlets tipo `ConvertFrom-FastJson`, más rápido y con mejores errores que `ConvertFrom-Json`. *Hecho: `Test-WJson`, `ConvertFrom-WJson`, `Format-WJson` y `Get-WJsonValue` (5.1 y 7).* |
 | Componente **WinRT / COM** | 🔵 | Uso desde VBA, VBScript y apps UWP/WinUI. |
 | Conversión JSON ↔ Registro de Windows | 🔵 | Exportar/importar claves del registro como JSON. |
 | Eventos ETW / integración con logs | 🔵 | Diagnóstico de rendimiento con Windows Performance Analyzer. |
@@ -54,7 +54,7 @@ Es lo que diferenciaría el proyecto de un parser genérico.
 
 | Feature | Prioridad | Notas |
 |---|---|---|
-| API en **C** con ABI estable | 🟢 | Facilita bindings desde cualquier lenguaje. |
+| ✅ API en **C** con ABI estable | 🟢 | Facilita bindings desde cualquier lenguaje. *Hecho: `wjson/wjson.h`.* |
 | ◐ *Wrapper* moderno en **C++17/20** | 🟢 | Iteradores, `std::string_view`, `std::optional`, `operator[]`. *Hecho: API C++17 con `std::optional`/`std::string_view`. Pendiente: `operator[]` y vistas cómodas.* |
 | ✅ Serialización (*writer*) | 🟢 | Salida compacta y formateada (*pretty-print*), indentación configurable, opción de escapar no-ASCII. |
 | ✅ Consultas **JSON Pointer** (RFC 6901) | 🟡 | `doc.at("/users/0/name")`. |
@@ -75,18 +75,18 @@ Es lo que diferenciaría el proyecto de un parser genérico.
 | `wjson diff a.json b.json` | 🔵 | Diferencias semánticas, ignorando formato y orden de claves. |
 | `wjson convert` | 🔵 | JSON ↔ YAML / CSV / XML. |
 | Salida con colores | 🟡 | Usando secuencias VT de la consola de Windows (Windows Terminal). |
-| ✅ Ejecutable único sin dependencias | 🟢 | Fácil de distribuir con **winget** y **Scoop**. |
+| ✅ Ejecutable único sin dependencias | 🟢 | Fácil de distribuir con **winget** y **Scoop**. *Manifiestos de winget generados en cada release; falta enviarlos.* |
 
 ## 6. Calidad, seguridad y mantenimiento
 
 | Feature | Prioridad | Notas |
 |---|---|---|
 | ✅ Tests unitarios + JSONTestSuite en CI | 🟢 | GitHub Actions con runners `windows-latest` (y Linux para portabilidad). |
-| *Fuzzing* continuo | 🟡 | libFuzzer con clang-cl; candidato a OSS-Fuzz. |
+| ✅ *Fuzzing* continuo | 🟡 | libFuzzer con clang-cl; candidato a OSS-Fuzz. *Hecho: libFuzzer en Linux en cada cambio y cada noche, con corpus persistente y comprobaciones diferenciales. Pendiente: OSS-Fuzz.* |
 | ◐ AddressSanitizer / análisis estático | 🟡 | `/fsanitize=address` de MSVC, `/analyze`, clang-tidy. *Hecho: ASan + UBSan en Linux (CI). Pendiente: MSVC y análisis estático.* |
 | Cobertura de código | 🟡 | Informe publicado en cada PR. |
 | ◐ Documentación | 🟢 | README con ejemplos, referencia de la API generada (Doxygen) y guía de migración desde otras bibliotecas. *Hecho: README y documentos de diseño. Pendiente: Doxygen y guía de migración.* |
-| Versionado semántico y CHANGELOG | 🟢 | Releases con binarios firmados (*code signing*) para evitar avisos de SmartScreen. |
+| ◐ Versionado semántico y CHANGELOG | 🟢 | Releases con binarios firmados (*code signing*) para evitar avisos de SmartScreen. *Hecho: semver, CHANGELOG y flujo de release. Pendiente: firma de código.* |
 | ✅ Licencia permisiva | 🟢 | MIT. |
 
 ---
@@ -95,7 +95,7 @@ Es lo que diferenciaría el proyecto de un parser genérico.
 
 1. ✅ **v0.1 – MVP:** parser DOM conforme a RFC 8259, errores con línea/columna, UTF-8/UTF-16 con BOM, writer con pretty-print, API C++, CLI `validate`/`format`/`minify`, CI en Windows con JSONTestSuite. La API en C pasa a v1.0.
 2. ✅ **v0.5:** parser en streaming, JSONC, JSON Pointer, límites de seguridad, benchmarks publicados, paquete vcpkg (port *overlay*; falta enviarlo al registro oficial).
-3. **v1.0:** API estable (también en C), DLL, NuGet + bindings .NET, módulo de PowerShell, fuzzing continuo, distribución por winget.
+3. ◐ **v1.0:** API estable (también en C), DLL, NuGet + bindings .NET, módulo de PowerShell, fuzzing continuo, distribución por winget. *Todo implementado; falta etiquetar `v1.0.0` y publicar en nuget.org, PowerShell Gallery y winget (ver [RELEASING.md](RELEASING.md)).*
 4. **Futuro:** SIMD, JSON Schema, JSONPath, JSON Patch, COM/WinRT, conversión de formatos.
 
 ## Decisiones tomadas
