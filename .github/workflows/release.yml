@@ -186,7 +186,13 @@ jobs:
 
       - name: Publish to NuGet
         if: env.NUGET_API_KEY != ''
-        run: dotnet nuget push "dist/*.nupkg" --api-key "$env:NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        shell: pwsh
+        run: |
+          # Pass the full path: dotnet nuget push does not expand "dist/*.nupkg" on Windows.
+          # The .snupkg next to it is pushed automatically.
+          $package = Get-ChildItem dist -Filter '*.nupkg' | Select-Object -First 1
+          dotnet nuget push $package.FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Publish to the PowerShell Gallery
         if: env.PSGALLERY_API_KEY != ''
