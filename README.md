@@ -4,7 +4,7 @@
 
 Parser de JSON rápido, robusto y conforme a estándares, escrito en C++17 y diseñado para Windows.
 
-> Versión 1.0.0 (pendiente de publicar). Las APIs de C++ y C siguen [versionado semántico](CHANGELOG.md).
+> Versión [1.0.0](https://github.com/imontene/win-json-parser/releases/tag/v1.0.0). Las APIs de C++ y C siguen [versionado semántico](CHANGELOG.md).
 
 ## Características
 
@@ -146,15 +146,12 @@ Funciona en Windows PowerShell 5.1 y en PowerShell 7. A diferencia de `ConvertFr
 
 ## Instalación
 
-Cuando se publique la versión 1.0.0 (ver [docs/RELEASING.md](docs/RELEASING.md)):
-
 ```powershell
-winget install imontene.wjson              # CLI
-Install-Module Wjson                       # PowerShell
-dotnet add package Imontene.Wjson          # .NET
+Install-Module Wjson                       # PowerShell (PowerShell Gallery)
+dotnet add package Imontene.Wjson          # .NET (NuGet)
 ```
 
-Mientras tanto, cada ejecución del CI genera estos artefactos para descargar.
+El CLI `wjson.exe` se descarga desde la [release 1.0.0](https://github.com/imontene/win-json-parser/releases/tag/v1.0.0) (x64, x86 y ARM64). La instalación con `winget install imontene.wjson` estará disponible cuando se acepten sus manifiestos en winget-pkgs.
 
 ### vcpkg
 

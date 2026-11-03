@@ -2,7 +2,7 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). El proyecto sigue [versionado semántico](https://semver.org/lang/es/): a partir de 1.0.0, la API pública (C++ y C) solo cambia de forma incompatible en una nueva versión mayor.
 
-## [1.0.0] - sin publicar
+## [1.0.0] - 2026-11-03
 
 ### Añadido
 - **API en C** (`wjson/wjson.h`) con ABI estable: documentos opacos, validación en streaming, formateo, JSON Pointer y estructuras de opciones versionadas.
