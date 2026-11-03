@@ -18,9 +18,30 @@ Parser de JSON rápido, robusto y conforme a estándares, escrito en C++17 y dis
 - Serialización compacta o formateada, con opción de escapar todo lo que no sea ASCII.
 - Herramienta de línea de comandos `wjson.exe` en un único ejecutable, sin dependencias.
 - Disponible desde **C++**, **C** (ABI estable, `wjson.dll`), **.NET** (NuGet) y **PowerShell** (módulo `Wjson`).
+- **wjson Viewer**: aplicación de escritorio para Windows con editor, árbol y validación en vivo.
 - Probado con JSONTestSuite, sanitizers y **fuzzing continuo**.
 
 Consulta la hoja de ruta en [docs/FEATURES.md](docs/FEATURES.md), el diseño en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) y el rendimiento en [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+## wjson Viewer
+
+![wjson Viewer mostrando un documento con el árbol expandido hasta /tiendas/2/ciudad](docs/images/viewer.png)
+
+Aplicación de escritorio para Windows 10 y 11 (WinUI 3):
+
+- **Editor** con validación mientras escribes. Los errores indican línea y columna, y el enlace **Ir al error** lleva a la posición exacta.
+- **Árbol** del documento con valores coloreados por tipo. Los arrays grandes se dividen en rangos de 1000 elementos.
+- **Búsqueda con JSON Pointer**: escribe `/tiendas/2/ciudad` y se expande el árbol hasta ese valor. Puedes copiar el puntero o el valor de cualquier nodo.
+- **Formatear**, **minificar** y modo **JSONC**, que se activa solo con los archivos `.jsonc`.
+- Conserva la codificación (UTF-8, UTF-8 con BOM, UTF-16) y los finales de línea al guardar.
+- Los archivos de más de 8 MB se abren en solo lectura y se validan en streaming.
+- Abrir, guardar y arrastrar archivos. Interfaz en español o inglés, según Windows.
+
+No necesita instalación: descomprime `wjson-viewer-<versión>-windows-<arquitectura>.zip` y ejecuta `WjsonViewer.exe`. Se incluirá en las releases a partir de la próxima versión; mientras tanto, cada ejecución del flujo **GUI** en *Actions* genera el zip para x64. Desde la línea de comandos:
+
+```powershell
+WjsonViewer.exe datos.json --pointer /usuarios/0 --lang es
+```
 
 ## Uso de la CLI
 

@@ -186,6 +186,8 @@ namespace Wjson.Viewer
             }
 
             _path = path;
+            // .jsonc files (VS Code, Windows Terminal) allow comments and trailing commas.
+            if (string.Equals(Path.GetExtension(path), ".jsonc", StringComparison.OrdinalIgnoreCase)) JsoncToggle.IsChecked = true;
             _encoding = file.Encoding;
             _newlines = file.NewlineStyle;
             _selected = null;

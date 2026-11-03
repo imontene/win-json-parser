@@ -96,15 +96,15 @@ Es lo que diferenciaría el proyecto de un parser genérico.
 1. ✅ **v0.1 – MVP:** parser DOM conforme a RFC 8259, errores con línea/columna, UTF-8/UTF-16 con BOM, writer con pretty-print, API C++, CLI `validate`/`format`/`minify`, CI en Windows con JSONTestSuite. La API en C pasa a v1.0.
 2. ✅ **v0.5:** parser en streaming, JSONC, JSON Pointer, límites de seguridad, benchmarks publicados, paquete vcpkg (port *overlay*; falta enviarlo al registro oficial).
 3. ◐ **v1.0:** API estable (también en C), DLL, NuGet + bindings .NET, módulo de PowerShell, fuzzing continuo, distribución por winget. *Todo implementado; falta etiquetar `v1.0.0` y publicar en nuget.org, PowerShell Gallery y winget (ver [RELEASING.md](RELEASING.md)).*
-4. **Futuro:** SIMD, JSON Schema, JSONPath, JSON Patch, COM/WinRT, conversión de formatos.
+4. **Futuro:** ◐ GUI (*wjson Viewer*, ver [ARCHITECTURE.md](ARCHITECTURE.md#la-gui-wjson-viewer)), SIMD, JSON Schema, JSONPath, JSON Patch, COM/WinRT, conversión de formatos.
 
 ## Decisiones tomadas
 
 - **Lenguaje de implementación:** C++17, compilado con CMake (MSVC, clang-cl y MinGW).
 - **Licencia:** MIT.
-- **Objetivo principal:** una biblioteca reutilizable, con la CLI como primera interfaz y una GUI posible más adelante (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
+- **Objetivo principal:** una biblioteca reutilizable, con la CLI y la GUI como interfaces (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
+- **Tecnología de la GUI:** WinUI 3 (Windows App SDK), en C# sobre el binding de .NET.
 
 ## Decisiones abiertas
 
-- **Tecnología de la GUI:** WinUI 3, Win32, Qt o Dear ImGui.
 - **Portabilidad:** ¿exclusivamente Windows o multiplataforma con extras específicos de Windows? Lo segundo amplía la base de usuarios sin perder el enfoque.
