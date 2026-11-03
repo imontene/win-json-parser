@@ -16,7 +16,6 @@ using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.Storage.Pickers;
-using Windows.System;
 using Wjson.Viewer.Core;
 
 namespace Wjson.Viewer
@@ -472,7 +471,7 @@ namespace Wjson.Viewer
 
         private void PointerBox_KeyDown(object sender, KeyRoutedEventArgs e)
         {
-            if (e.Key != VirtualKey.Enter) return;
+            if (e.Key != Windows.System.VirtualKey.Enter) return;
             e.Handled = true;
             NavigateTo(PointerBox.Text.Trim());
         }
