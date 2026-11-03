@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned commit of https://github.com/nst/JSONTestSuite
+  JSON_TEST_SUITE_REF: 1ef36fa01286573e846ac449e8683f8833c5b26a
+
+jobs:
+  windows-msvc:
+    name: ${{ matrix.name }} (${{ matrix.config }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: MSVC x64, preset: msvc-x64, config: Release, run: true, conformance: true, artifact: true }
+          - { name: MSVC x64, preset: msvc-x64, config: Debug, run: true }
+          - { name: MSVC x86, preset: msvc-x86, config: Release, run: true }
+          - { name: clang-cl x64, preset: clang-cl-x64, config: Release, run: true, conformance: true }
+          # Cross-compiled on an x64 runner: build only, the tests cannot run there.
+          - { name: MSVC ARM64, preset: msvc-arm64, config: Release, run: false, artifact: true }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build build/${{ matrix.preset }} --config ${{ matrix.config }} --parallel
+
+      - name: Test
+        if: matrix.run
+        run: ctest --test-dir build/${{ matrix.preset }} -C ${{ matrix.config }} --output-on-failure
+
+      - name: Checkout JSONTestSuite
+        if: matrix.conformance
+        uses: actions/checkout@v4
+        with:
+          repository: nst/JSONTestSuite
+          ref: ${{ env.JSON_TEST_SUITE_REF }}
+          path: JSONTestSuite
+
+      - name: Conformance (JSONTestSuite)
+        if: matrix.conformance
+        run: python scripts/run_jsontestsuite.py build/${{ matrix.preset }}/${{ matrix.config }}/wjson.exe JSONTestSuite/test_parsing
+
+      - name: Upload wjson.exe
+        if: matrix.artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wjson-${{ matrix.preset }}
+          path: build/${{ matrix.preset }}/${{ matrix.config }}/wjson.exe
+          if-no-files-found: error
+
+  windows-mingw:
+    name: MinGW-w64 (UCRT64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+
+      - name: Configure
+        run: cmake -S . -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DWJSON_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build build/mingw --parallel
+
+      - name: Test
+        run: ctest --test-dir build/mingw --output-on-failure
+
+      - name: Checkout JSONTestSuite
+        uses: actions/checkout@v4
+        with:
+          repository: nst/JSONTestSuite
+          ref: ${{ env.JSON_TEST_SUITE_REF }}
+          path: JSONTestSuite
+
+      - name: Conformance (JSONTestSuite)
+        run: python scripts/run_jsontestsuite.py build/mingw/wjson.exe JSONTestSuite/test_parsing
+
+  linux:
+    # Portability check and sanitizers (ASan/UBSan are not yet wired up for MSVC).
+    name: Linux ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: GCC, preset: linux-gcc }
+          - { name: Clang + ASan/UBSan, preset: linux-clang-sanitize }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build build/${{ matrix.preset }} --parallel
+
+      - name: Test
+        run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
+
+      - name: Checkout JSONTestSuite
+        uses: actions/checkout@v4
+        with:
+          repository: nst/JSONTestSuite
+          ref: ${{ env.JSON_TEST_SUITE_REF }}
+          path: JSONTestSuite
+
+      - name: Conformance (JSONTestSuite)
+        run: python3 scripts/run_jsontestsuite.py build/${{ matrix.preset }}/wjson JSONTestSuite/test_parsing

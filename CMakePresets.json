@@ -1,0 +1,61 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "WJSON_WARNINGS_AS_ERRORS": "ON" }
+    },
+    {
+      "name": "windows-base",
+      "hidden": true,
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "msvc-x64",
+      "displayName": "MSVC x64",
+      "inherits": "windows-base",
+      "architecture": { "value": "x64", "strategy": "set" }
+    },
+    {
+      "name": "msvc-x86",
+      "displayName": "MSVC x86 (32-bit)",
+      "inherits": "windows-base",
+      "architecture": { "value": "Win32", "strategy": "set" }
+    },
+    {
+      "name": "msvc-arm64",
+      "displayName": "MSVC ARM64",
+      "inherits": "windows-base",
+      "architecture": { "value": "ARM64", "strategy": "set" }
+    },
+    {
+      "name": "clang-cl-x64",
+      "displayName": "clang-cl x64",
+      "inherits": "windows-base",
+      "architecture": { "value": "x64", "strategy": "set" },
+      "toolset": { "value": "ClangCL", "strategy": "set" }
+    },
+    {
+      "name": "linux-gcc",
+      "displayName": "Linux GCC (portability check)",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "CMAKE_CXX_COMPILER": "g++" }
+    },
+    {
+      "name": "linux-clang-sanitize",
+      "displayName": "Linux Clang + ASan/UBSan",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "WJSON_SANITIZE": "ON"
+      }
+    }
+  ]
+}

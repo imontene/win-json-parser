@@ -1,0 +1,19 @@
+# Build output
+/build/
+/out/
+
+# IDEs
+/.vs/
+/.vscode/
+/.idea/
+CMakeUserPresets.json
+*.user
+
+# Generated / OS files
+compile_commands.json
+Thumbs.db
+.DS_Store
+__pycache__/
+
+# Local copy of JSONTestSuite
+/JSONTestSuite/

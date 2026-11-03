@@ -96,8 +96,13 @@ Es lo que diferenciaría el proyecto de un parser genérico.
 3. **v1.0:** API estable, NuGet + bindings .NET, módulo de PowerShell, fuzzing continuo, distribución por winget.
 4. **Futuro:** SIMD, JSON Schema, JSONPath, JSON Patch, COM/WinRT, conversión de formatos.
 
+## Decisiones tomadas
+
+- **Lenguaje de implementación:** C++17, compilado con CMake (MSVC, clang-cl y MinGW).
+- **Objetivo principal:** una biblioteca reutilizable, con la CLI como primera interfaz y una GUI posible más adelante (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
+
 ## Decisiones abiertas
 
-- **Lenguaje de implementación:** C++ (máximo rendimiento e integración nativa con Win32), Rust (seguridad de memoria; buen soporte de Windows) o C# (si el público principal es .NET).
-- **Objetivo principal:** ¿biblioteca para desarrolladores, herramienta CLI para usuarios finales, o ambas?
+- **Tecnología de la GUI:** WinUI 3, Win32, Qt o Dear ImGui.
+- **Licencia:** MIT o Apache-2.0.
 - **Portabilidad:** ¿exclusivamente Windows o multiplataforma con extras específicos de Windows? Lo segundo amplía la base de usuarios sin perder el enfoque.
