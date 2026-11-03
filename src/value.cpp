@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: TBD
+// SPDX-License-Identifier: MIT
 #include "wjson/wjson.hpp"
 
 namespace wjson {

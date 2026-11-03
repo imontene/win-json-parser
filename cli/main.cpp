@@ -1,6 +1,6 @@
 // wjson command-line tool. A thin front-end over the wjson library: all JSON
 // logic lives in the library so other front-ends (GUI, bindings) can reuse it.
-// SPDX-License-Identifier: TBD
+// SPDX-License-Identifier: MIT
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>

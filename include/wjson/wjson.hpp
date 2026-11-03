@@ -1,5 +1,5 @@
 // wjson - strict, fast JSON parser for Windows.
-// SPDX-License-Identifier: TBD
+// SPDX-License-Identifier: MIT
 #pragma once
 
 #include <cstddef>

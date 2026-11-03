@@ -99,10 +99,10 @@ Es lo que diferenciaría el proyecto de un parser genérico.
 ## Decisiones tomadas
 
 - **Lenguaje de implementación:** C++17, compilado con CMake (MSVC, clang-cl y MinGW).
+- **Licencia:** MIT.
 - **Objetivo principal:** una biblioteca reutilizable, con la CLI como primera interfaz y una GUI posible más adelante (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
 
 ## Decisiones abiertas
 
 - **Tecnología de la GUI:** WinUI 3, Win32, Qt o Dear ImGui.
-- **Licencia:** MIT o Apache-2.0.
 - **Portabilidad:** ¿exclusivamente Windows o multiplataforma con extras específicos de Windows? Lo segundo amplía la base de usuarios sin perder el enfoque.

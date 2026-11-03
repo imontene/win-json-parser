@@ -1,5 +1,5 @@
 // Internal UTF-8 helpers. Not part of the public API.
-// SPDX-License-Identifier: TBD
+// SPDX-License-Identifier: MIT
 #pragma once
 
 #include <cstddef>

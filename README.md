@@ -81,4 +81,4 @@ python scripts/run_jsontestsuite.py build/msvc-x64/Release/wjson.exe JSONTestSui
 
 ## Licencia
 
-Por definir (se sugiere MIT o Apache-2.0).
+[MIT](LICENSE).
