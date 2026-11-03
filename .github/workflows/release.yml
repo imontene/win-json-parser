@@ -107,13 +107,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           pattern: native-*
           path: native
           merge-multiple: true
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           pattern: cli-*
           path: dist
@@ -165,10 +165,13 @@ jobs:
       contents: write
     env:
       VERSION: ${{ needs.version.outputs.version }}
+      # Job-level env: a step's own env is not visible in its `if` condition.
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: release-${{ env.VERSION }}
           path: dist
@@ -182,14 +185,10 @@ jobs:
           gh release create "v$env:VERSION" (Get-ChildItem dist -File).FullName --title "wjson $env:VERSION" --notes $notes --verify-tag
 
       - name: Publish to NuGet
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         if: env.NUGET_API_KEY != ''
         run: dotnet nuget push "dist/*.nupkg" --api-key "$env:NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Publish to the PowerShell Gallery
-        env:
-          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
         if: env.PSGALLERY_API_KEY != ''
         shell: pwsh
         run: |

@@ -1,0 +1,54 @@
+name: Publish existing release
+
+# Publishes the packages of an existing GitHub release to nuget.org and/or the
+# PowerShell Gallery, e.g. if the keys were added after the release was made.
+# Uses the same secrets as release.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v1.0.0"
+        required: true
+      nuget:
+        description: "Publish to nuget.org"
+        type: boolean
+        default: true
+      psgallery:
+        description: "Publish to the PowerShell Gallery"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+    steps:
+      - name: Download release assets
+        shell: pwsh
+        run: |
+          gh release download $env:TAG --repo ${{ github.repository }} --dir dist --pattern '*.nupkg' --pattern '*.snupkg' --pattern 'Wjson-powershell-*.zip'
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Publish to NuGet
+        if: github.event.inputs.nuget == 'true'
+        shell: pwsh
+        run: |
+          if (-not $env:NUGET_API_KEY) { throw 'The NUGET_API_KEY secret is not set' }
+          dotnet nuget push "dist/*.nupkg" --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish to the PowerShell Gallery
+        if: github.event.inputs.psgallery == 'true'
+        shell: pwsh
+        run: |
+          if (-not $env:PSGALLERY_API_KEY) { throw 'The PSGALLERY_API_KEY secret is not set' }
+          $zip = Get-ChildItem dist -Filter 'Wjson-powershell-*.zip' | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath module
+          Publish-Module -Path module/Wjson -NuGetApiKey $env:PSGALLERY_API_KEY
