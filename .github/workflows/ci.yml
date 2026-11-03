@@ -32,7 +32,7 @@ jobs:
           # Cross-compiled on an x64 runner: build only, the tests cannot run there.
           - { name: MSVC ARM64, preset: msvc-arm64, config: Release, run: false, artifact: true }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
@@ -46,7 +46,7 @@ jobs:
 
       - name: Checkout JSONTestSuite
         if: matrix.conformance
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nst/JSONTestSuite
           ref: ${{ env.JSON_TEST_SUITE_REF }}
@@ -58,7 +58,7 @@ jobs:
 
       - name: Upload wjson.exe
         if: matrix.artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wjson-${{ matrix.preset }}
           path: build/${{ matrix.preset }}/${{ matrix.config }}/wjson.exe
@@ -71,7 +71,7 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: msys2/setup-msys2@v2
         with:
@@ -93,7 +93,7 @@ jobs:
         run: ctest --test-dir build/mingw --output-on-failure
 
       - name: Checkout JSONTestSuite
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nst/JSONTestSuite
           ref: ${{ env.JSON_TEST_SUITE_REF }}
@@ -113,7 +113,7 @@ jobs:
           - { name: GCC, preset: linux-gcc }
           - { name: Clang + ASan/UBSan, preset: linux-clang-sanitize }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Ninja
         run: sudo apt-get update && sudo apt-get install -y ninja-build
@@ -128,7 +128,7 @@ jobs:
         run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
 
       - name: Checkout JSONTestSuite
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nst/JSONTestSuite
           ref: ${{ env.JSON_TEST_SUITE_REF }}

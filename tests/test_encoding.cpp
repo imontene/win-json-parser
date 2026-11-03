@@ -52,7 +52,7 @@ TEST_CASE("parse_file") {
 }
 
 TEST_CASE("parse_file with a Unicode file name") {
-    const fs::path path = fs::temp_directory_path() / fs::u8path(u8"wjson_prueba_\u00f1_\u20ac.json");
+    const fs::path path = fs::temp_directory_path() / fs::path(u"wjson_prueba_\u00f1_\u20ac.json");
     std::ofstream(path, std::ios::binary) << R"({"ok": true})";
     const auto r = wjson::parse_file(path);
     REQUIRE(r);
