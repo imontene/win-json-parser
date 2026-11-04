@@ -21,6 +21,7 @@ list(TRANSFORM WJSON_SOURCES PREPEND "${PROJECT_SOURCE_DIR}/" OUTPUT_VARIABLE fu
 set_property(TARGET wjson_fuzz PROPERTY SOURCES fuzz_parse.cpp ${fuzz_library_sources})
 target_include_directories(wjson_fuzz PRIVATE
     ${PROJECT_SOURCE_DIR}/include ${WJSON_GENERATED_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/src)
+target_include_directories(wjson_fuzz SYSTEM PRIVATE ${WJSON_THIRD_PARTY_DIR})
 target_compile_features(wjson_fuzz PRIVATE cxx_std_17)
 target_compile_definitions(wjson_fuzz PRIVATE WJSON_STATIC_DEFINE WJSON_VERSION="${PROJECT_VERSION}")
 set_target_properties(wjson_fuzz PROPERTIES CXX_EXTENSIONS OFF)

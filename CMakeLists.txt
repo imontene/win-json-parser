@@ -47,6 +47,9 @@ target_include_directories(wjson
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+# Vendored third-party headers (fast_float), exempt from our warning flags.
+set(WJSON_THIRD_PARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party)
+target_include_directories(wjson SYSTEM PRIVATE ${WJSON_THIRD_PARTY_DIR})
 target_compile_features(wjson PUBLIC cxx_std_17)
 target_compile_definitions(wjson PRIVATE WJSON_BUILDING WJSON_VERSION="${PROJECT_VERSION}")
 set_target_properties(wjson PROPERTIES
@@ -74,6 +77,7 @@ if(WJSON_BUILD_CLI)
         target_sources(wjson_cli PRIVATE ${WJSON_SOURCES})
         target_include_directories(wjson_cli PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include ${WJSON_GENERATED_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_include_directories(wjson_cli SYSTEM PRIVATE ${WJSON_THIRD_PARTY_DIR})
         target_compile_features(wjson_cli PRIVATE cxx_std_17)
         target_compile_definitions(wjson_cli PRIVATE WJSON_STATIC_DEFINE)
         set_target_properties(wjson_cli PROPERTIES

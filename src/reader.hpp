@@ -5,6 +5,7 @@
 
 #include <charconv>
 #include <climits>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -13,6 +14,15 @@
 #include "sources.hpp"
 #include "utf8.hpp"
 #include "wjson/wjson.hpp"
+
+// Third-party code: compiled without this project's strict warnings.
+#if defined(_MSC_VER)
+#pragma warning(push, 0)
+#endif
+#include <fast_float/fast_float.h>  // src/third_party, a SYSTEM include directory
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 namespace wjson::detail {
 
@@ -62,7 +72,19 @@ private:
             // Skip the whitespace that is already buffered in one go.
             const std::string_view view = src_.available();
             std::size_t n = 0;
-            while (n < view.size() && is_space(view[n])) ++n;
+            while (n < view.size()) {
+                // Indentation: skip 8 spaces at a time.
+                if (view.size() - n >= 8) {
+                    std::uint64_t x;
+                    std::memcpy(&x, view.data() + n, 8);
+                    if (x == 0x2020202020202020ULL) {
+                        n += 8;
+                        continue;
+                    }
+                }
+                if (!is_space(view[n])) break;
+                ++n;
+            }
             if (n > 0) src_.skip_bytes(n);
 
             const int c = src_.peek();  // refills a stream when the buffer was all whitespace
@@ -393,8 +415,10 @@ private:
             // Too big for 64 bits: fall back to double.
         }
         out.is_integer = false;
-        const auto r = std::from_chars(first, last, out.real);
-        if (r.ec == std::errc::result_out_of_range) {
+        // fast_float (Eisel-Lemire): correctly rounded like std::from_chars,
+        // and several times faster than some standard libraries (e.g. MSVC's).
+        const auto r = fast_float::from_chars(first, last, out.real);
+        if (r.ec == std::errc::result_out_of_range || (r.ec == std::errc{} && !std::isfinite(out.real))) {
             if (is_overflow(num)) return fail_at(start, ErrorCode::NumberOutOfRange);
             out.real = num[0] == '-' ? -0.0 : 0.0;  // underflow rounds to zero
         } else if (r.ec != std::errc{} || r.ptr != last) {
