@@ -24,7 +24,7 @@ if (Test-Path $OutputPath) { Remove-Item $OutputPath -Recurse -Force }
 New-Item -ItemType Directory -Path $OutputPath | Out-Null
 
 Copy-Item (Join-Path $PSScriptRoot 'Wjson/Wjson.psd1'), (Join-Path $PSScriptRoot 'Wjson/Wjson.psm1') $OutputPath
-Copy-Item (Join-Path $PSScriptRoot '../../LICENSE') $OutputPath
+Copy-Item (Join-Path $PSScriptRoot '../../LICENSE'), (Join-Path $PSScriptRoot '../../THIRD_PARTY_NOTICES.md') $OutputPath
 
 foreach ($framework in 'netstandard2.0', 'net8.0') {
     $source = Join-Path $PSScriptRoot "../dotnet/src/Wjson/bin/$Configuration/$framework/Imontene.Wjson.dll"

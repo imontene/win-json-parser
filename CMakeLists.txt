@@ -135,6 +135,7 @@ if(WJSON_INSTALL)
     if(WJSON_BUILD_CLI)
         install(TARGETS wjson_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     endif()
+    install(FILES LICENSE THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
 endif()
 
 # ---------------------------------------------------------------------------

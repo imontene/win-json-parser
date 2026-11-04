@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include <fstream>
 #include <istream>
+#include <iterator>
 #include <utility>
 #include <vector>
 
@@ -13,6 +14,12 @@ namespace wjson {
 namespace {
 
 // Builds a Value tree from parse events.
+//
+// The children of each open container are collected in a scratch buffer for
+// its depth, reused across containers. When the container is complete, small
+// ones (the vast majority) are moved into a vector allocated once at exactly
+// the right size, instead of growing by repeated reallocation; large ones take
+// over the scratch buffer itself, so their elements are never copied twice.
 class DomBuilder {
 public:
     bool null_value() { return add(Value(nullptr)); }
@@ -21,43 +28,76 @@ public:
     bool number(double d) { return add(Value(d)); }
     bool string(std::string& s) { return add(Value(std::move(s))); }
     bool key(std::string& k) {
-        keys_.push_back(std::move(k));
+        frames_.back().key = std::move(k);
         return true;
     }
-    bool start_object() {
-        stack_.emplace_back(Object{});
-        return true;
+    bool start_object() { return open(true); }
+    bool start_array() { return open(false); }
+
+    bool end_object() {
+        Object object = finish(objects_[frames_.size() - 1]);
+        frames_.pop_back();
+        return add(Value(std::move(object)));
     }
-    bool start_array() {
-        stack_.emplace_back(Array{});
-        return true;
+
+    bool end_array() {
+        Array array = finish(arrays_[frames_.size() - 1]);
+        frames_.pop_back();
+        return add(Value(std::move(array)));
     }
-    bool end_object() { return end_container(); }
-    bool end_array() { return end_container(); }
 
     Value take() { return std::move(root_); }
 
 private:
-    bool end_container() {
-        Value done = std::move(stack_.back());
-        stack_.pop_back();
-        return add(std::move(done));
+    struct Frame {
+        bool is_object;
+        std::string key;  // pending key of an object member
+    };
+
+    // Containers above this size take over the scratch buffer instead of
+    // being copied out of it.
+    static constexpr std::size_t steal_threshold = 256;
+
+    template <typename T>
+    static std::vector<T> finish(std::vector<T>& scratch) {
+        if (scratch.size() > steal_threshold) {
+            std::vector<T> result = std::move(scratch);
+            scratch = std::vector<T>();  // moved-from vectors are valid but unspecified
+            return result;
+        }
+        std::vector<T> result(std::make_move_iterator(scratch.begin()), std::make_move_iterator(scratch.end()));
+        scratch.clear();
+        return result;
     }
 
-    bool add(Value v) {
-        if (stack_.empty()) {
-            root_ = std::move(v);
-        } else if (Value& parent = stack_.back(); parent.is_array()) {
-            parent.as_array().push_back(std::move(v));
-        } else {
-            parent.as_object().emplace_back(std::move(keys_.back()), std::move(v));
-            keys_.pop_back();
+    bool open(bool is_object) {
+        frames_.push_back(Frame{is_object, {}});
+        const std::size_t depth = frames_.size();
+        if (arrays_.size() < depth) {
+            arrays_.resize(depth);
+            objects_.resize(depth);
         }
         return true;
     }
 
-    std::vector<Value> stack_;  // containers being filled
-    std::vector<std::string> keys_;
+    bool add(Value v) {
+        if (frames_.empty()) {
+            root_ = std::move(v);
+            return true;
+        }
+        Frame& frame = frames_.back();
+        const std::size_t level = frames_.size() - 1;
+        if (frame.is_object) {
+            objects_[level].emplace_back(std::move(frame.key), std::move(v));
+        } else {
+            arrays_[level].push_back(std::move(v));
+        }
+        return true;
+    }
+
+    std::vector<Frame> frames_;                 // open containers, innermost last
+    std::vector<std::vector<Value>> arrays_;    // scratch items per depth
+    std::vector<std::vector<Member>> objects_;  // scratch members per depth
     Value root_;
 };
 

@@ -70,9 +70,9 @@ jobs:
         run: |
           $zipDir = "stage/wjson-$env:VERSION-windows-${{ matrix.arch }}"
           New-Item -ItemType Directory -Force $zipDir, "dist", "native/${{ matrix.rid }}/native" | Out-Null
-          Copy-Item build/cli/Release/wjson.exe, LICENSE, README.md $zipDir
+          Copy-Item build/cli/Release/wjson.exe, LICENSE, THIRD_PARTY_NOTICES.md, README.md $zipDir
           Compress-Archive -Path "$zipDir/*" -DestinationPath "dist/wjson-$env:VERSION-windows-${{ matrix.arch }}.zip"
-          Copy-Item LICENSE stage/viewer/
+          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md stage/viewer/
           Compress-Archive -Path "stage/viewer/*" -DestinationPath "dist/wjson-viewer-$env:VERSION-windows-${{ matrix.arch }}.zip"
           Copy-Item build/dll/Release/wjson.dll "native/${{ matrix.rid }}/native/"
           Copy-Item build/dll/Release/wjson.pdb "native/${{ matrix.rid }}/native/" -ErrorAction SilentlyContinue
