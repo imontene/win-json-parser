@@ -24,11 +24,19 @@ struct Position {
 };
 
 // Source interface used by Reader:
-//   int peek()          next byte (0-255) or -1 at the end / on source error
-//   void advance()      consume the byte returned by peek()
-//   Position mark()     position of the next byte
-//   ErrorCode error()   error raised by the source itself (I/O, encoding, size)
+//   int peek()              next byte (0-255) or -1 at the end / on source error
+//   void advance()          consume the byte returned by peek()
+//   string_view available() bytes that can be read right now without refilling
+//                           (may be empty even if more input follows: call peek())
+//   void skip_plain(n)      consume n bytes from available() that are printable
+//                           ASCII without line breaks (one column each)
+//   void skip_bytes(n)      consume any n bytes from available()
+//   Position mark()         position of the next byte
+//   ErrorCode error()       error raised by the source itself (I/O, encoding, size)
 //   ParseError make_error(ErrorCode, Position)
+//   static constexpr bool whole_document
+//                           true if available() always reaches the end of the
+//                           input, so a token that ends there is complete
 
 // Whole document in memory. Line and column are computed only on error.
 class MemorySource {
@@ -42,6 +50,13 @@ public:
         return -1;
     }
     void advance() noexcept { ++pos_; }
+    std::string_view available() const noexcept {
+        return pos_ < size_ ? std::string_view(text_.data() + pos_, size_ - pos_) : std::string_view{};
+    }
+    void skip_plain(std::size_t n) noexcept { pos_ += n; }
+    void skip_bytes(std::size_t n) noexcept { pos_ += n; }
+    static constexpr bool whole_document = true;
+
     Position mark() const noexcept { return {pos_, 0, 0}; }
     ErrorCode error() const noexcept { return error_; }
 
@@ -93,6 +108,19 @@ public:
             if ((c & 0xC0) != 0x80) ++column_;
         }
     }
+
+    std::string_view available() const noexcept {
+        return pos_ < len_ ? std::string_view(buf_.data() + pos_, len_ - pos_) : std::string_view{};
+    }
+    void skip_plain(std::size_t n) noexcept {
+        pos_ += n;
+        column_ += n;
+        prev_cr_ = false;
+    }
+    void skip_bytes(std::size_t n) noexcept {
+        for (std::size_t i = 0; i < n; ++i) advance();
+    }
+    static constexpr bool whole_document = false;
 
     Position mark() const noexcept { return {base_ + pos_, line_, column_}; }
     ErrorCode error() const noexcept { return error_; }

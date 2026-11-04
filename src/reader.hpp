@@ -6,6 +6,7 @@
 #include <charconv>
 #include <climits>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <system_error>
 
@@ -54,16 +55,23 @@ private:
     bool emit(bool keep_going) { return keep_going || fail(ErrorCode::Cancelled); }
 
     // Whitespace and, if enabled, comments.
+    static bool is_space(char c) noexcept { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
+
     bool skip_whitespace() {
         for (;;) {
-            const int c = src_.peek();
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-                src_.advance();
-            } else if (c == '/' && options_.allow_comments) {
+            // Skip the whitespace that is already buffered in one go.
+            const std::string_view view = src_.available();
+            std::size_t n = 0;
+            while (n < view.size() && is_space(view[n])) ++n;
+            if (n > 0) src_.skip_bytes(n);
+
+            const int c = src_.peek();  // refills a stream when the buffer was all whitespace
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') continue;
+            if (c == '/' && options_.allow_comments) {
                 if (!skip_comment()) return false;
-            } else {
-                return true;
+                continue;
             }
+            return true;
         }
     }
 
@@ -280,11 +288,42 @@ private:
         return true;
     }
 
+    // Length of the leading run of bytes that need no special handling in a
+    // string: not '"', '\\', a control character or a non-ASCII byte. Tests 8
+    // bytes at a time (SWAR); a false positive only falls back to the byte loop.
+    static std::size_t plain_run(const char* p, std::size_t n) noexcept {
+        constexpr std::uint64_t ones = 0x0101010101010101ULL;
+        constexpr std::uint64_t highs = 0x8080808080808080ULL;
+        std::size_t i = 0;
+        for (; i + 8 <= n; i += 8) {
+            std::uint64_t x;
+            std::memcpy(&x, p + i, 8);
+            const std::uint64_t quote = x ^ (ones * std::uint64_t{'"'});
+            const std::uint64_t backslash = x ^ (ones * std::uint64_t{'\\'});
+            const std::uint64_t special = ((quote - ones) & ~quote) | ((backslash - ones) & ~backslash) |
+                                          ((x - ones * std::uint64_t{0x20}) & ~x) | x;
+            if ((special & highs) != 0) break;
+        }
+        for (; i < n; ++i) {
+            const auto c = static_cast<unsigned char>(p[i]);
+            if (c == '"' || c == '\\' || c < 0x20 || c >= 0x80) break;
+        }
+        return i;
+    }
+
     bool parse_string(std::string& out) {
         const Position start = src_.mark();
         out.clear();
         src_.advance();  // opening quote
         for (;;) {
+            // Fast path: copy the run of ordinary characters at once.
+            const std::string_view view = src_.available();
+            if (const std::size_t n = plain_run(view.data(), view.size()); n > 0) {
+                if (out.size() + n > options_.max_string_length) return fail_at(start, ErrorCode::StringTooLong);
+                out.append(view.data(), n);
+                src_.skip_plain(n);
+            }
+
             const int c = src_.peek();
             if (c == '"') {
                 src_.advance();
@@ -305,7 +344,83 @@ private:
         }
     }
 
+    // Length of a well-formed number at the start of `s`, or 0 if the text
+    // there is not one (the slow path then reports the exact error).
+    static std::size_t scan_number(std::string_view s, bool& is_integer) noexcept {
+        std::size_t i = 0;
+        auto digit = [&](std::size_t k) { return k < s.size() && is_digit(s[k]); };
+        is_integer = true;
+        if (i < s.size() && s[i] == '-') ++i;
+        if (!digit(i)) return 0;
+        if (s[i] == '0') {
+            ++i;
+            if (digit(i)) return 0;  // leading zero
+        } else {
+            while (digit(i)) ++i;
+        }
+        if (i < s.size() && s[i] == '.') {
+            is_integer = false;
+            ++i;
+            if (!digit(i)) return 0;
+            while (digit(i)) ++i;
+        }
+        if (i < s.size() && (s[i] == 'e' || s[i] == 'E')) {
+            is_integer = false;
+            ++i;
+            if (i < s.size() && (s[i] == '+' || s[i] == '-')) ++i;
+            if (!digit(i)) return 0;
+            while (digit(i)) ++i;
+        }
+        return i;
+    }
+
+    struct Number {
+        bool is_integer = false;
+        std::int64_t integer = 0;
+        double real = 0.0;
+    };
+
+    // Converts the text of a well-formed number. Errors are reported at `start`.
+    bool convert_number(std::string_view num, bool is_integer, Position start, Number& out) {
+        const char* first = num.data();
+        const char* last = num.data() + num.size();
+        if (is_integer) {
+            const auto r = std::from_chars(first, last, out.integer);
+            if (r.ec == std::errc{} && r.ptr == last) {
+                out.is_integer = true;
+                return true;
+            }
+            // Too big for 64 bits: fall back to double.
+        }
+        out.is_integer = false;
+        const auto r = std::from_chars(first, last, out.real);
+        if (r.ec == std::errc::result_out_of_range) {
+            if (is_overflow(num)) return fail_at(start, ErrorCode::NumberOutOfRange);
+            out.real = num[0] == '-' ? -0.0 : 0.0;  // underflow rounds to zero
+        } else if (r.ec != std::errc{} || r.ptr != last) {
+            return fail_at(start, ErrorCode::InvalidNumber);
+        }
+        return true;
+    }
+
+    bool emit_number(const Number& n) { return emit(n.is_integer ? sink_.integer(n.integer) : sink_.number(n.real)); }
+
     bool parse_number() {
+        // Fast path: the number is in the buffer, converted where it lies.
+        const std::string_view view = src_.available();
+        bool is_integer = true;
+        const std::size_t length = scan_number(view, is_integer);
+        if (length > 0 && (length < view.size() || Source::whole_document)) {
+            Number n;
+            if (!convert_number(view.substr(0, length), is_integer, src_.mark(), n)) return false;
+            src_.skip_plain(length);
+            return emit_number(n);
+        }
+        return parse_number_slow();
+    }
+
+    // Byte-by-byte path: numbers split across stream chunks, and every error.
+    bool parse_number_slow() {
         const Position start = src_.mark();
         std::string& num = num_;
         num.clear();
@@ -341,23 +456,9 @@ private:
             take_digits();
         }
 
-        const char* first = num.data();
-        const char* last = num.data() + num.size();
-        if (is_integer) {
-            std::int64_t i = 0;
-            const auto r = std::from_chars(first, last, i);
-            if (r.ec == std::errc{} && r.ptr == last) return emit(sink_.integer(i));
-            // Too big for 64 bits: fall back to double.
-        }
-        double d = 0.0;
-        const auto r = std::from_chars(first, last, d);
-        if (r.ec == std::errc::result_out_of_range) {
-            if (is_overflow(num)) return fail_at(start, ErrorCode::NumberOutOfRange);
-            d = num[0] == '-' ? -0.0 : 0.0;  // underflow rounds to zero
-        } else if (r.ec != std::errc{} || r.ptr != last) {
-            return fail_at(start, ErrorCode::InvalidNumber);
-        }
-        return emit(sink_.number(d));
+        Number n;
+        if (!convert_number(num, is_integer, start, n)) return false;
+        return emit_number(n);
     }
 
     // Distinguishes overflow from underflow for an out-of-range number by
