@@ -34,23 +34,39 @@ Añade `--markdown` para obtener una tabla y `--min-time N` para cambiar los seg
 
 El job `benchmark` del CI publica la tabla en el resumen de cada ejecución en `main` (pestaña *Actions* → ejecución → *Summary*). Al ser máquinas compartidas, conviene comparar tendencias, no cifras sueltas.
 
-### Windows, MSVC x64 Release (runner `windows-latest` de GitHub, v0.5.0)
+### Windows, MSVC x64 Release (runner `windows-2025-vs2026` de GitHub)
 
-| File | Size (MB) | DOM parse (MB/s) | SAX parse (MB/s) | SAX stream (MB/s) | Serialize (MB/s) |
-|---|---:|---:|---:|---:|---:|
-| canada.json | 2.25 | 61 | 88 | 65 | 238 |
-| citm_catalog.json | 1.73 | 276 | 657 | 228 | 1394 |
-| twitter.json | 0.63 | 181 | 362 | 192 | 486 |
+Las dos filas de cada archivo se midieron en el mismo tipo de máquina: 1.1.0 y la versión actual.
 
-`canada.json` es mucho más lento con MSVC que con GCC (88 frente a 348 MB/s en SAX). Casi todo el archivo son números en coma flotante, y la conversión `std::from_chars` de MSVC es el cuello de botella. Es la primera optimización candidata (por ejemplo, con el algoritmo de [fast_float](https://github.com/fastfloat/fast_float)).
+| File | Versión | DOM parse (MB/s) | SAX parse (MB/s) | SAX stream (MB/s) | Serialize (MB/s) |
+|---|---|---:|---:|---:|---:|
+| canada.json | 1.1.0 | 51 | 76 | 60 | 213 |
+| canada.json | actual | **179** (×3,5) | **379** (×5,0) | **261** (×4,4) | 229 |
+| citm_catalog.json | 1.1.0 | 243 | 440 | 226 | 1031 |
+| citm_catalog.json | actual | **451** (×1,9) | **900** (×2,0) | **338** (×1,5) | 1035 |
+| twitter.json | 1.1.0 | 149 | 268 | 173 | 303 |
+| twitter.json | actual | **248** (×1,7) | **451** (×1,7) | **269** (×1,6) | 302 |
 
-### Linux, GCC 13, `-O3` (contenedor de desarrollo, v0.5.0)
+### Linux, GCC 13, `-O3` (contenedor de desarrollo, mejor de tres ejecuciones)
 
-| File | Size (MB) | DOM parse (MB/s) | SAX parse (MB/s) | SAX stream (MB/s) | Serialize (MB/s) |
-|---|---:|---:|---:|---:|---:|
-| canada.json | 2.25 | 184 | 348 | 283 | 351 |
-| citm_catalog.json | 1.73 | 376 | 737 | 339 | 1586 |
-| twitter.json | 0.63 | 254 | 532 | 329 | 648 |
+| File | Versión | DOM parse (MB/s) | SAX parse (MB/s) | SAX stream (MB/s) | Serialize (MB/s) |
+|---|---|---:|---:|---:|---:|
+| canada.json | 1.1.0 | 227 | 427 | 342 | 414 |
+| canada.json | actual | **268** | **650** | **540** | 426 |
+| citm_catalog.json | 1.1.0 | 427 | 926 | 370 | 1842 |
+| citm_catalog.json | actual | **607** | **1131** | **578** | 1849 |
+| twitter.json | 1.1.0 | 308 | 588 | 421 | 738 |
+| twitter.json | actual | **429** | **845** | **523** | 782 |
+
+### Qué cambió
+
+Un perfil con `callgrind` mostró dónde se iba el tiempo; cada cambio ataca uno de esos puntos:
+
+- **Lectura por bloques.** Las dos fuentes de entrada exponen los bytes ya disponibles en un bloque contiguo. Los strings se copian por tramos, buscando su final de 8 en 8 bytes (SWAR, C++ portable). Los espacios se saltan en un bucle cerrado, de 8 en 8 cuando son indentación. Los números se convierten directamente donde están, sin copiarlos byte a byte.
+- **Números en coma flotante con [fast_float](https://github.com/fastfloat/fast_float)** (algoritmo Eisel-Lemire), en lugar de `std::from_chars`. Es la causa de la gran mejora en Windows: la implementación de MSVC era el cuello de botella. En Linux la diferencia es menor porque la biblioteca estándar de GCC 12+ ya usa ese algoritmo. Se verificó bit a bit contra `std::from_chars` con 3 millones de números, incluidos subnormales y los límites de desbordamiento.
+- **DOM sin realocaciones.** Cada contenedor se reserva una sola vez con su tamaño final, en vez de crecer duplicando su capacidad.
+
+La serialización no cambió; la columna *Serialize* sirve de control de que las máquinas son comparables.
 
 ### Memoria en archivos grandes
 
@@ -66,5 +82,6 @@ El streaming mantiene la memoria constante sea cual sea el tamaño del archivo. 
 ## Próximos pasos
 
 - Comparar con otras bibliotecas (RapidJSON, nlohmann/json, simdjson) en el mismo job.
-- Conversión de números más rápida en MSVC (ver `canada.json` arriba).
-- Optimizaciones previstas: strings sin copias (*zero-copy*), asignador *arena* para el DOM y SIMD para saltar espacios y buscar comillas.
+- Reducir la memoria del DOM (hoy ~7 veces el tamaño del JSON): un `Value` más compacto o un asignador *arena*.
+- SIMD explícito (SSE2/AVX2/NEON) para buscar comillas y escapes en bloques de 16 a 32 bytes.
+- Serialización: escribir números y strings sin pasar por buffers intermedios.

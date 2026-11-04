@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). El proyecto sigue [versionado semántico](https://semver.org/lang/es/): a partir de 1.0.0, la API pública (C++ y C) solo cambia de forma incompatible en una nueva versión mayor.
 
+## [Sin publicar]
+
+### Cambiado
+- **Parser más rápido**: en Windows (MSVC), de ×1,7 a ×5 según el archivo (`canada.json`: SAX de 76 a 379 MB/s); en Linux, entre un 20 % y un 58 % más rápido. Ver [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+  - Strings, espacios y números se leen por bloques en lugar de byte a byte.
+  - Los números en coma flotante se convierten con fast_float (Eisel-Lemire), con resultados idénticos bit a bit a los de antes.
+  - El DOM reserva cada contenedor una sola vez, con su tamaño final.
+
+### Añadido
+- `THIRD_PARTY_NOTICES.md`, con la licencia de fast_float, incluido en todos los paquetes.
+
 ## [1.1.0] - 2026-11-03
 
 ### Añadido

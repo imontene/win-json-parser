@@ -29,8 +29,8 @@ Este documento recoge las funcionalidades propuestas para un parser de JSON orie
 | Feature | Prioridad | Notas |
 |---|---|---|
 | ◐ Benchmarks reproducibles desde el día 1 | 🟢 | Comparar con alternativas de referencia (p. ej. simdjson, RapidJSON, System.Text.Json) con archivos estándar (`twitter.json`, `canada.json`, `citm_catalog.json`). *Hecho: `wjson_bench` y publicación en CI ([BENCHMARKS.md](BENCHMARKS.md)). Pendiente: comparación con otras bibliotecas.* |
-| Parsing sin copias (*zero-copy*) | 🟡 | Las strings sin escapes apuntan al buffer original. |
-| Aceleración SIMD (SSE4.2 / AVX2 / AVX-512, ARM64 NEON) | 🔵 | Con detección de CPU en tiempo de ejecución y *fallback* escalar. |
+| ◐ Parsing sin copias (*zero-copy*) | 🟡 | Las strings sin escapes apuntan al buffer original. *Hecho: números convertidos donde están y strings copiados por tramos. Pendiente: strings que apunten al buffer.* |
+| ◐ Aceleración SIMD (SSE4.2 / AVX2 / AVX-512, ARM64 NEON) | 🔵 | Con detección de CPU en tiempo de ejecución y *fallback* escalar. *Hecho: búsqueda de 8 en 8 bytes (SWAR, portable) y números con fast_float. Pendiente: instrucciones SIMD explícitas.* |
 | Archivos mapeados en memoria | 🟡 | `CreateFileMapping` / `MapViewOfFile` para archivos grandes. |
 | Asignador de memoria configurable | 🔵 | Arena / *pool allocator* para reducir fragmentación. |
 
