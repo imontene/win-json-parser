@@ -4,7 +4,7 @@
 
 Parser de JSON rápido, robusto y conforme a estándares, escrito en C++17 y diseñado para Windows.
 
-> Versión [1.1.0](https://github.com/imontene/win-json-parser/releases/latest). Las APIs de C++ y C siguen [versionado semántico](CHANGELOG.md).
+> Versión [1.2.0](https://github.com/imontene/win-json-parser/releases/latest). Las APIs de C++ y C siguen [versionado semántico](CHANGELOG.md).
 
 ## Características
 

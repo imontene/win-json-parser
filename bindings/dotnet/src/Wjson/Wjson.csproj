@@ -10,7 +10,7 @@
     <RootNamespace>Wjson</RootNamespace>
     <!-- Not "Wjson": on Windows it would clash with the native wjson.dll in the same folder. -->
     <AssemblyName>Imontene.Wjson</AssemblyName>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
 
     <!-- NuGet package -->
     <PackageId>Imontene.Wjson</PackageId>

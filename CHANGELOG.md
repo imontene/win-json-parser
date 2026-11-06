@@ -2,7 +2,7 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). El proyecto sigue [versionado semántico](https://semver.org/lang/es/): a partir de 1.0.0, la API pública (C++ y C) solo cambia de forma incompatible en una nueva versión mayor.
 
-## [Sin publicar]
+## [1.2.0] - 2026-11-06
 
 ### Cambiado
 - **Parser más rápido**: en Windows (MSVC), de ×1,7 a ×5 según el archivo (`canada.json`: SAX de 76 a 379 MB/s); en Linux, entre un 20 % y un 58 % más rápido. Ver [docs/BENCHMARKS.md](docs/BENCHMARKS.md).

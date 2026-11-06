@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(wjson
-    VERSION 1.1.0
+    VERSION 1.2.0
     DESCRIPTION "Strict, fast JSON parser for Windows"
     LANGUAGES CXX)
 
