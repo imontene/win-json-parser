@@ -136,3 +136,47 @@ TEST_CASE("error positions") {
     // CRLF line endings count as one line break.
     CHECK(err("[\r\n1,\r\nx]").line == 3);
 }
+
+TEST_CASE("special characters at every position (block boundaries of the fast scans)") {
+    for (std::size_t length = 1; length < 70; ++length) {
+        for (std::size_t pos = 0; pos < length; ++pos) {
+            INFO("length ", length, " position ", pos);
+            const std::string before(pos, 'a');
+            const std::string after(length - pos - 1, 'b');
+
+            // An escape sequence.
+            const auto escaped = wjson::parse("\"" + before + "\\n" + after + "\"");
+            REQUIRE(escaped);
+            CHECK(escaped.value->as_string() == before + "\n" + after);
+
+            // A two-byte UTF-8 character.
+            const auto utf8 = wjson::parse("\"" + before + "\xC3\xA9" + after + "\"");
+            REQUIRE(utf8);
+            CHECK(utf8.value->as_string() == before + "\xC3\xA9" + after);
+
+            // A control character: error exactly there.
+            const auto control = wjson::parse("\"" + before + "\x01" + after + "\"");
+            REQUIRE_FALSE(control);
+            CHECK(control.error.code == ErrorCode::ControlCharacterInString);
+            CHECK(control.error.column == pos + 2);
+
+            // The closing quote.
+            const auto closed = wjson::parse("[\"" + before + "\"," + std::to_string(length) + "]");
+            REQUIRE(closed);
+            CHECK(closed.value->as_array()[0].as_string() == before);
+        }
+    }
+}
+
+TEST_CASE("whitespace runs of every length") {
+    const char kinds[] = {' ', '\n', '\r', '\t'};
+    for (std::size_t length = 0; length < 70; ++length) {
+        std::string ws;
+        for (std::size_t i = 0; i < length; ++i) ws += kinds[(i * 7 + length) % 4];
+        INFO("length ", length);
+        const auto r = wjson::parse("[" + ws + "1" + ws + "," + ws + "2" + ws + "]" + ws);
+        REQUIRE(r);
+        CHECK(r.value->as_array().size() == 2);
+        CHECK(wjson::parse("[" + ws + "x]").error.code == ErrorCode::UnexpectedCharacter);
+    }
+}

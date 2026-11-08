@@ -11,6 +11,7 @@
 #include <string>
 #include <system_error>
 
+#include "scan.hpp"
 #include "sources.hpp"
 #include "utf8.hpp"
 #include "wjson/wjson.hpp"
@@ -65,26 +66,11 @@ private:
     bool emit(bool keep_going) { return keep_going || fail(ErrorCode::Cancelled); }
 
     // Whitespace and, if enabled, comments.
-    static bool is_space(char c) noexcept { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
-
     bool skip_whitespace() {
         for (;;) {
             // Skip the whitespace that is already buffered in one go.
             const std::string_view view = src_.available();
-            std::size_t n = 0;
-            while (n < view.size()) {
-                // Indentation: skip 8 spaces at a time.
-                if (view.size() - n >= 8) {
-                    std::uint64_t x;
-                    std::memcpy(&x, view.data() + n, 8);
-                    if (x == 0x2020202020202020ULL) {
-                        n += 8;
-                        continue;
-                    }
-                }
-                if (!is_space(view[n])) break;
-                ++n;
-            }
+            const std::size_t n = whitespace_run(view.data(), view.size());
             if (n > 0) src_.skip_bytes(n);
 
             const int c = src_.peek();  // refills a stream when the buffer was all whitespace
@@ -308,29 +294,6 @@ private:
             src_.advance();
         }
         return true;
-    }
-
-    // Length of the leading run of bytes that need no special handling in a
-    // string: not '"', '\\', a control character or a non-ASCII byte. Tests 8
-    // bytes at a time (SWAR); a false positive only falls back to the byte loop.
-    static std::size_t plain_run(const char* p, std::size_t n) noexcept {
-        constexpr std::uint64_t ones = 0x0101010101010101ULL;
-        constexpr std::uint64_t highs = 0x8080808080808080ULL;
-        std::size_t i = 0;
-        for (; i + 8 <= n; i += 8) {
-            std::uint64_t x;
-            std::memcpy(&x, p + i, 8);
-            const std::uint64_t quote = x ^ (ones * std::uint64_t{'"'});
-            const std::uint64_t backslash = x ^ (ones * std::uint64_t{'\\'});
-            const std::uint64_t special = ((quote - ones) & ~quote) | ((backslash - ones) & ~backslash) |
-                                          ((x - ones * std::uint64_t{0x20}) & ~x) | x;
-            if ((special & highs) != 0) break;
-        }
-        for (; i < n; ++i) {
-            const auto c = static_cast<unsigned char>(p[i]);
-            if (c == '"' || c == '\\' || c < 0x20 || c >= 0x80) break;
-        }
-        return i;
     }
 
     bool parse_string(std::string& out) {

@@ -30,7 +30,7 @@ Este documento recoge las funcionalidades propuestas para un parser de JSON orie
 |---|---|---|
 | ◐ Benchmarks reproducibles desde el día 1 | 🟢 | Comparar con alternativas de referencia (p. ej. simdjson, RapidJSON, System.Text.Json) con archivos estándar (`twitter.json`, `canada.json`, `citm_catalog.json`). *Hecho: `wjson_bench` y publicación en CI ([BENCHMARKS.md](BENCHMARKS.md)). Pendiente: comparación con otras bibliotecas.* |
 | ◐ Parsing sin copias (*zero-copy*) | 🟡 | Las strings sin escapes apuntan al buffer original. *Hecho: números convertidos donde están y strings copiados por tramos. Pendiente: strings que apunten al buffer.* |
-| ◐ Aceleración SIMD (SSE4.2 / AVX2 / AVX-512, ARM64 NEON) | 🔵 | Con detección de CPU en tiempo de ejecución y *fallback* escalar. *Hecho: búsqueda de 8 en 8 bytes (SWAR, portable) y números con fast_float. Pendiente: instrucciones SIMD explícitas.* |
+| ◐ Aceleración SIMD (SSE4.2 / AVX2 / AVX-512, ARM64 NEON) | 🔵 | Con detección de CPU en tiempo de ejecución y *fallback* escalar. *Hecho: SSE2 en x86/x64 (16 bytes por paso), SWAR portable de 8 bytes en el resto y números con fast_float. Pendiente: NEON en ARM64 (falta un runner ARM en CI para probarlo) y AVX2.* |
 | Archivos mapeados en memoria | 🟡 | `CreateFileMapping` / `MapViewOfFile` para archivos grandes. |
 | ◐ Asignador de memoria configurable | 🔵 | Arena / *pool allocator* para reducir fragmentación. *Hecho: `wjson::Document`, documento compacto de solo lectura con todos los valores en un array y todos los textos en un único buffer (~2,4 veces menos memoria que `Value`). Pendiente: un `Value` modificable más compacto (requiere versión mayor).* |
 

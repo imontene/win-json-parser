@@ -9,6 +9,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). E
 
 ### Cambiado
 - El CLI usa `Document` en `format`, `minify` y `query`: con un archivo de 137 MB, la memoria máxima baja de 1,2 GB a 760 MB.
+- Búsqueda con SSE2 (x86/x64) del final de los strings y de los espacios, de 16 en 16 bytes: entre un 20 % y un 30 % más rápido en documentos con mucho texto o indentación. En otras arquitecturas se mantiene la versión portable de 8 en 8 bytes.
 
 ## [1.2.0] - 2026-11-06
 

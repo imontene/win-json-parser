@@ -92,5 +92,5 @@ El streaming mantiene la memoria constante sea cual sea el tamaño del archivo. 
 
 - Comparar con otras bibliotecas (RapidJSON, nlohmann/json, simdjson) en el mismo job.
 - Bajar el pico de memoria de `Document` (almacenamiento por bloques en lugar de arrays que se realocan).
-- SIMD explícito (SSE2/AVX2/NEON) para buscar comillas y escapes en bloques de 16 a 32 bytes.
+- NEON en ARM64 y AVX2 (32 bytes por paso) para las búsquedas que hoy usan SSE2.
 - Serialización: escribir números y strings sin pasar por buffers intermedios.
