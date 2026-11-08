@@ -40,6 +40,10 @@ using detail::DocumentNode;
 
 constexpr std::uint64_t max_u32 = std::numeric_limits<std::uint32_t>::max();
 
+// Sizes compared in 64 bits: correct on 32-bit targets too, where a size_t
+// can never exceed max_u32 (MSVC flags such comparisons as dead code).
+constexpr std::uint64_t u64(std::size_t n) noexcept { return n; }
+
 // Parser sink that fills a Document. Children of each open container are
 // collected in a scratch buffer for its depth and copied into the shared link
 // arrays as one contiguous block when the container ends.
@@ -57,7 +61,7 @@ public:
     bool number(double d) { return add(Type::Double, 0, bits(d)); }
 
     bool string(std::string& s) {
-        if (s.size() > max_u32) return too_large();
+        if (u64(s.size()) > max_u32) return too_large();
         const std::uint64_t offset = strings_.size();
         strings_.append(s);
         return add(Type::String, static_cast<std::uint32_t>(s.size()), offset);
@@ -65,7 +69,7 @@ public:
 
     bool key(std::string& k) {
         // Keys are addressed with 32 bits, so they must start within 4 GiB.
-        if (strings_.size() + k.size() > max_u32) return too_large();
+        if (u64(strings_.size()) + u64(k.size()) > max_u32) return too_large();
         Frame& frame = frames_.back();
         frame.key_offset = static_cast<std::uint32_t>(strings_.size());
         frame.key_length = static_cast<std::uint32_t>(k.size());
@@ -78,7 +82,7 @@ public:
 
     bool end_object() {
         auto& scratch = member_scratch_[frames_.size() - 1];
-        if (scratch.size() > max_u32) return too_large();
+        if (u64(scratch.size()) > max_u32) return too_large();
         DocumentNode& node = nodes_[frames_.back().node];
         node.count = static_cast<std::uint32_t>(scratch.size());
         node.payload = members_.size();
@@ -90,7 +94,7 @@ public:
 
     bool end_array() {
         auto& scratch = element_scratch_[frames_.size() - 1];
-        if (scratch.size() > max_u32) return too_large();
+        if (u64(scratch.size()) > max_u32) return too_large();
         DocumentNode& node = nodes_[frames_.back().node];
         node.count = static_cast<std::uint32_t>(scratch.size());
         node.payload = elements_.size();
@@ -124,7 +128,7 @@ private:
 
     // Appends a node and links it to the open container, if any.
     bool add(Type type, std::uint32_t count, std::uint64_t payload) {
-        if (nodes_.size() >= max_u32) return too_large();
+        if (u64(nodes_.size()) >= max_u32) return too_large();
         const auto index = static_cast<std::uint32_t>(nodes_.size());
         nodes_.push_back(DocumentNode{static_cast<std::uint8_t>(type), {0, 0, 0}, count, payload});
         if (!frames_.empty()) {
