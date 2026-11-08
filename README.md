@@ -35,12 +35,14 @@ Aplicación de escritorio para Windows 10 y 11 (WinUI 3):
 - **Formatear**, **minificar** y modo **JSONC**, que se activa solo con los archivos `.jsonc`.
 - Conserva la codificación (UTF-8, UTF-8 con BOM, UTF-16) y los finales de línea al guardar.
 - Los archivos de más de 8 MB se abren en solo lectura y se validan en streaming.
+- **Comparar** con otro archivo: lista lo añadido, eliminado y cambiado, y al seleccionar una diferencia la muestra en el árbol.
 - Abrir, guardar y arrastrar archivos. Interfaz en español o inglés, según Windows.
 
 No necesita instalación: descarga `wjson-viewer-<versión>-windows-<arquitectura>.zip` de la [última release](https://github.com/imontene/win-json-parser/releases/latest), descomprímelo y ejecuta `WjsonViewer.exe`. Desde la línea de comandos:
 
 ```powershell
 WjsonViewer.exe datos.json --pointer /usuarios/0 --lang es
+WjsonViewer.exe v1.json --compare v2.json
 ```
 
 ## Uso de la CLI

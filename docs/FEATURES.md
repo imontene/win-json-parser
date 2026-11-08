@@ -72,7 +72,7 @@ Es lo que diferenciaría el proyecto de un parser genérico.
 | ◐ `wjson format` / `wjson minify` | 🟢 | Formatear o compactar, en sitio o hacia stdout. *Hecho: hacia stdout. Pendiente: en sitio (`--in-place`).* |
 | ✅ Lectura desde stdin y pipes | 🟢 | `type data.json \| wjson query /items/0`. |
 | ✅ `wjson query <pointer>` | 🟡 | Extraer valores (alternativa ligera a `jq`). |
-| `wjson diff a.json b.json` | 🔵 | Diferencias semánticas, ignorando formato y orden de claves. |
+| ◐ `wjson diff a.json b.json` | 🔵 | Diferencias semánticas, ignorando formato y orden de claves. *Hecho: en wjson Viewer (botón Comparar). Pendiente: el comando del CLI.* |
 | `wjson convert` | 🔵 | JSON ↔ YAML / CSV / XML. |
 | Salida con colores | 🟡 | Usando secuencias VT de la consola de Windows (Windows Terminal). |
 | ✅ Ejecutable único sin dependencias | 🟢 | Fácil de distribuir con **winget** y **Scoop**. *Manifiestos de winget generados en cada release; falta enviarlos.* |

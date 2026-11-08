@@ -97,4 +97,4 @@ Linux: presets `linux-gcc` y `linux-clang-sanitize` (ASan + UBSan).
 
 ## Pendiente
 
-Ver `docs/FEATURES.md`. Lo más inmediato: enviar winget, bajar el pico de memoria de `Document`, SIMD explícito, mejoras del visor (comparar archivos, resaltado, enlazar árbol y texto, progreso al abrir archivos enormes) y firma de código de los ejecutables.
+Ver `docs/FEATURES.md`. Lo más inmediato: enviar winget, bajar el pico de memoria de `Document`, SIMD explícito, mejoras del visor (resaltado, enlazar árbol y texto, progreso al abrir archivos enormes), `wjson diff` en el CLI y firma de código de los ejecutables.

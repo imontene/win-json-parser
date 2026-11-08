@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). E
 ## [Sin publicar]
 
 ### Añadido
+- **Comparar archivos en wjson Viewer**: botón *Comparar* (y argumento `--compare otro.json`) que lista lo añadido, eliminado y cambiado entre el documento abierto y otro archivo, con su JSON Pointer; al seleccionar una diferencia se muestra en el árbol. Los objetos se comparan por clave, sin importar el orden; los arrays se alinean para que un elemento insertado en medio cuente como una sola diferencia; y los números se comparan por valor (`1` es igual a `1.0`).
 - **`wjson::Document`**: documento compacto de solo lectura (`parse_document`, `parse_document_file`, `parse_document_stream`), con acceso mediante `ValueRef` (`find`, `at_pointer`, índices, `to_value()`) y `serialize(ValueRef)`. Ocupa unas 2,4 veces menos memoria que el árbol `Value` y se construye 1,4 veces más rápido. La API existente no cambia.
 
 ### Cambiado

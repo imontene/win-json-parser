@@ -101,7 +101,9 @@ Algunos detalles:
 - **Finales de línea**: el `TextBox` de WinUI guarda los saltos de línea como `\r`. Al guardar se restauran los del archivo original (LF o CRLF).
 - **Idioma**: el de Windows, o el que se indique con `--lang es` / `--lang en`.
 
-Pendiente: comparación de dos archivos, resaltado de sintaxis en el editor, enlace entre la selección del árbol y el texto, y progreso y cancelación al abrir archivos muy grandes.
+- **Comparación** (`JsonDiff` en `Wjson.Viewer.Core`): objetos por clave, arrays alineados con la subsecuencia común más larga (sobre identificadores de una forma canónica de cada elemento, para comparar enteros y no subárboles) y números por valor. A partir de 4 millones de celdas de alineación, los arrays se comparan por posición; los resultados se limitan a 10 000.
+
+Pendiente: resaltado de sintaxis en el editor, enlace entre la selección del árbol y el texto, y progreso y cancelación al abrir archivos muy grandes.
 
 ## Capas para otros lenguajes
 
