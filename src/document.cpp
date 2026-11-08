@@ -183,6 +183,10 @@ DocumentResult failure(ErrorCode code) {
 
 [[noreturn]] void wrong_type() { throw std::bad_variant_access(); }
 
+// A node's payload as an index or offset. A document in memory never exceeds
+// what size_t can address, so this cannot truncate (it matters on 32-bit).
+std::size_t position(std::uint64_t payload) noexcept { return static_cast<std::size_t>(payload); }
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -241,7 +245,7 @@ double ValueRef::as_double() const {
 std::string_view ValueRef::as_string() const {
     if (!is_string()) wrong_type();
     const DocumentNode& n = node();
-    return std::string_view(doc_->strings_.data() + n.payload, n.count);
+    return std::string_view(doc_->strings_.data() + position(n.payload), n.count);
 }
 
 std::size_t ValueRef::size() const noexcept { return is_array() || is_object() ? node().count : 0; }
@@ -250,14 +254,14 @@ ValueRef ValueRef::operator[](std::size_t index) const {
     if (!is_array()) wrong_type();
     const DocumentNode& n = node();
     if (index >= n.count) throw std::out_of_range("wjson::ValueRef: array index out of range");
-    return ValueRef(doc_, doc_->elements_[n.payload + index]);
+    return ValueRef(doc_, doc_->elements_[position(n.payload) + index]);
 }
 
 std::string_view ValueRef::key(std::size_t index) const {
     if (!is_object()) wrong_type();
     const DocumentNode& n = node();
     if (index >= n.count) throw std::out_of_range("wjson::ValueRef: member index out of range");
-    const DocumentMember& m = doc_->members_[n.payload + index];
+    const DocumentMember& m = doc_->members_[position(n.payload) + index];
     return std::string_view(doc_->strings_.data() + m.key_offset, m.key_length);
 }
 
@@ -265,7 +269,7 @@ ValueRef ValueRef::value(std::size_t index) const {
     if (!is_object()) wrong_type();
     const DocumentNode& n = node();
     if (index >= n.count) throw std::out_of_range("wjson::ValueRef: member index out of range");
-    return ValueRef(doc_, doc_->members_[n.payload + index].value);
+    return ValueRef(doc_, doc_->members_[position(n.payload) + index].value);
 }
 
 std::optional<ValueRef> ValueRef::find(std::string_view key) const noexcept {
@@ -273,7 +277,7 @@ std::optional<ValueRef> ValueRef::find(std::string_view key) const noexcept {
     const DocumentNode& n = node();
     // Reverse search: the last duplicate wins, as in Value::find().
     for (std::size_t i = n.count; i-- > 0;) {
-        const DocumentMember& m = doc_->members_[n.payload + i];
+        const DocumentMember& m = doc_->members_[position(n.payload) + i];
         if (std::string_view(doc_->strings_.data() + m.key_offset, m.key_length) == key)
             return ValueRef(doc_, m.value);
     }
