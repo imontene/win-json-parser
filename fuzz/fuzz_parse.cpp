@@ -8,6 +8,7 @@
 //   3. Any accepted document survives serialize -> parse unchanged, in both
 //      compact and pretty form.
 //   4. The C API agrees with the C++ API.
+//   5. The compact Document agrees with the Value tree.
 //
 // The first input byte selects the parse options, so the fuzzer also explores
 // JSONC, depth limits and stream buffer sizes.
@@ -78,6 +79,16 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         }
         // Exercise JSON Pointer with arbitrary input; must not crash.
         (void)value.at_pointer(text);
+    }
+
+    // 5. Compact Document vs Value tree
+    const wjson::DocumentResult document = wjson::parse_document(text, options);
+    if (document.error.code != dom.error.code || document.error.offset != dom.error.offset)
+        violated("Document and Value disagree");
+    if (dom && document) {
+        if (wjson::serialize(document.document->root()) != wjson::serialize(*dom.value))
+            violated("Document serializes differently from Value");
+        (void)document.document->root().at_pointer(text);
     }
 
     // 4. C API

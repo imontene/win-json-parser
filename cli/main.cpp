@@ -263,7 +263,8 @@ int run(const std::vector<std::string>& args) {
 
         auto input = read_input(file, exit_code);
         if (!input) continue;
-        const auto result = wjson::parse(input->text, parse_options);
+        // A compact read-only Document: about half the memory of a Value tree.
+        const auto result = wjson::parse_document(input->text, parse_options);
         if (!result) {
             report(*input, result.error);
             if (exit_code == Ok) exit_code = InvalidJson;
@@ -272,7 +273,7 @@ int run(const std::vector<std::string>& args) {
         if (command == "validate") {
             if (files.size() > 1) std::cout << input->name << ": ok\n";
         } else if (command == "query") {
-            const wjson::Value* found = result.value->at_pointer(*pointer);
+            const auto found = result.document->root().at_pointer(*pointer);
             if (!found) {
                 std::cerr << "wjson: " << input->name << ": no value at '" << *pointer << "'\n";
                 return NotFound;
@@ -283,7 +284,7 @@ int run(const std::vector<std::string>& args) {
                 std::cout << wjson::serialize(*found, write_options) << '\n';
             }
         } else {
-            std::cout << wjson::serialize(*result.value, write_options) << '\n';
+            std::cout << wjson::serialize(result.document->root(), write_options) << '\n';
         }
     }
     return exit_code;

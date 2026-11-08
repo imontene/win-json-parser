@@ -19,6 +19,7 @@ include(cmake/CompilerOptions.cmake)
 # ---------------------------------------------------------------------------
 set(WJSON_SOURCES
     src/c_api.cpp
+    src/document.cpp
     src/encoding.cpp
     src/parser.cpp
     src/value.cpp

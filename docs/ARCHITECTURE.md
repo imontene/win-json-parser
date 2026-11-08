@@ -59,6 +59,17 @@ La gramática JSON está escrita **una sola vez** (`src/reader.hpp`) como planti
 
 Así, cualquier cambio en la gramática (por ejemplo, JSON5) se aplica a la vez al DOM y al streaming. Los tests comprueban que ambos caminos producen exactamente los mismos eventos y errores, incluso con buffers de 4 bytes que cortan tokens a la mitad.
 
+## Dos representaciones del documento
+
+| | `Value` (`parse`) | `Document` (`parse_document`) |
+|---|---|---|
+| Uso | Modificable: se puede editar y construir desde código | Solo lectura |
+| Memoria | ~7 veces el JSON | ~3 veces el JSON |
+| Estructura | Árbol de `std::variant` con `std::string` y `std::vector` | Un array de nodos de 16 bytes, un array de enlaces por tipo de contenedor y un único buffer de texto |
+| Acceso | Referencias a `std::string`, `Array` y `Object` | `ValueRef` (puntero al documento + índice): `as_string()` devuelve un `string_view` dentro del buffer |
+
+En `Document` los nodos están en orden de documento, así que la raíz es el nodo 0. Cada contenedor guarda cuántos hijos tiene y dónde empieza su bloque de enlaces, que es contiguo, de modo que el elemento *i* se encuentra en tiempo constante. Lo construye `src/document.cpp` como un *sink* más de la misma gramática (`Reader`), igual que `DomBuilder`, así que los errores y sus posiciones son idénticos a los de `parse()`. Los tests y el fuzzer comprueban que ambos dan exactamente el mismo resultado.
+
 ## Decisiones de diseño que facilitan la GUI
 
 - **La biblioteca no escribe en consola ni termina el proceso.** Devuelve resultados (`ParseResult`) y nunca llama a `exit()` ni imprime nada, así que se puede usar dentro de una ventana sin efectos secundarios.

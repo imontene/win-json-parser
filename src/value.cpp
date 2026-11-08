@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#include "pointer.hpp"
 #include "wjson/wjson.hpp"
 
 namespace wjson {
@@ -22,40 +23,6 @@ Value* Value::find(std::string_view key) noexcept {
     return const_cast<Value*>(static_cast<const Value&>(*this).find(key));
 }
 
-namespace {
-
-// Decodes one JSON Pointer reference token ("~1" -> "/", "~0" -> "~").
-// Returns false if the token contains an invalid escape.
-bool unescape_token(std::string_view token, std::string& out) {
-    out.clear();
-    for (std::size_t i = 0; i < token.size(); ++i) {
-        if (token[i] != '~') {
-            out.push_back(token[i]);
-            continue;
-        }
-        if (++i == token.size()) return false;
-        if (token[i] == '0') out.push_back('~');
-        else if (token[i] == '1') out.push_back('/');
-        else return false;
-    }
-    return true;
-}
-
-// Parses an array index: "0" or digits without a leading zero.
-bool parse_index(std::string_view token, std::size_t& index) noexcept {
-    if (token.empty() || (token.size() > 1 && token[0] == '0')) return false;
-    std::size_t value = 0;
-    for (const char c : token) {
-        if (c < '0' || c > '9') return false;
-        const auto digit = static_cast<std::size_t>(c - '0');
-        if (value > (std::numeric_limits<std::size_t>::max() - digit) / 10) return false;
-        value = value * 10 + digit;
-    }
-    index = value;
-    return true;
-}
-
-}  // namespace
 
 const Value* Value::at_pointer(std::string_view pointer) const noexcept {
     if (pointer.empty()) return this;
@@ -70,12 +37,12 @@ const Value* Value::at_pointer(std::string_view pointer) const noexcept {
             pointer = end == std::string_view::npos ? std::string_view{} : pointer.substr(end);
 
             if (current->is_object()) {
-                if (!unescape_token(raw, token)) return nullptr;
+                if (!detail::unescape_token(raw, token)) return nullptr;
                 current = current->find(token);
             } else if (current->is_array()) {
                 std::size_t index = 0;
                 // "-" (one past the end) never refers to an existing element.
-                if (!parse_index(raw, index) || index >= current->as_array().size()) return nullptr;
+                if (!detail::parse_index(raw, index) || index >= current->as_array().size()) return nullptr;
                 current = &current->as_array()[index];
             } else {
                 return nullptr;

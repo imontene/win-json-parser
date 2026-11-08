@@ -8,11 +8,12 @@ Contexto para trabajar en este repositorio. El usuario escribe en español: resp
 
 | Ruta | Contenido |
 |---|---|
-| `include/wjson/wjson.hpp` | API pública C++ (DOM `Value`, `parse`, `Handler` SAX, `serialize`, JSON Pointer). |
+| `include/wjson/wjson.hpp` | API pública C++ (DOM `Value`, documento compacto `Document`/`ValueRef`, `parse`, `Handler` SAX, `serialize`, JSON Pointer). |
 | `include/wjson/wjson.h` | API pública C con ABI estable; base de todos los bindings. |
 | `src/reader.hpp` | **La gramática, escrita una sola vez**: plantilla `Reader<Source, Sink>`. |
 | `src/sources.hpp` | `MemorySource` (texto completo) y `StreamSource` (por bloques, UTF-16→UTF-8). |
 | `src/parser.cpp` | `DomBuilder`, `HandlerSink` y las funciones públicas de parseo. |
+| `src/document.cpp` | `Document` compacto: `DocumentBuilder` (otro *sink* de `Reader`) y `ValueRef`. |
 | `src/c_api.cpp` | API C sobre la C++. Ninguna excepción cruza la frontera. |
 | `src/third_party/fast_float/` | fast_float v8.3.2 *vendorizado* (conversión de doubles). |
 | `cli/` | `wjson.exe`: `validate`, `format`, `minify`, `query`. |
@@ -96,4 +97,4 @@ Linux: presets `linux-gcc` y `linux-clang-sanitize` (ASan + UBSan).
 
 ## Pendiente
 
-Ver `docs/FEATURES.md`. Lo más inmediato: enviar winget, reducir la memoria del DOM (~7× el tamaño del JSON), SIMD explícito, mejoras del visor (comparar archivos, resaltado, enlazar árbol y texto, progreso al abrir archivos enormes) y firma de código de los ejecutables.
+Ver `docs/FEATURES.md`. Lo más inmediato: enviar winget, bajar el pico de memoria de `Document`, SIMD explícito, mejoras del visor (comparar archivos, resaltado, enlazar árbol y texto, progreso al abrir archivos enormes) y firma de código de los ejecutables.

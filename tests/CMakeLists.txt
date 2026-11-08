@@ -27,6 +27,7 @@ endif()
 
 add_executable(wjson_tests
     main.cpp
+    test_document.cpp
     test_encoding.cpp
     test_parser.cpp
     test_pointer.cpp

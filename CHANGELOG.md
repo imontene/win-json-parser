@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). El proyecto sigue [versionado semántico](https://semver.org/lang/es/): a partir de 1.0.0, la API pública (C++ y C) solo cambia de forma incompatible en una nueva versión mayor.
 
+## [Sin publicar]
+
+### Añadido
+- **`wjson::Document`**: documento compacto de solo lectura (`parse_document`, `parse_document_file`, `parse_document_stream`), con acceso mediante `ValueRef` (`find`, `at_pointer`, índices, `to_value()`) y `serialize(ValueRef)`. Ocupa unas 2,4 veces menos memoria que el árbol `Value` y se construye 1,4 veces más rápido. La API existente no cambia.
+
+### Cambiado
+- El CLI usa `Document` en `format`, `minify` y `query`: con un archivo de 137 MB, la memoria máxima baja de 1,2 GB a 760 MB.
+
 ## [1.2.0] - 2026-11-06
 
 ### Cambiado

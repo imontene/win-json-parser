@@ -7,6 +7,7 @@
 | Columna | Operación |
 |---|---|
 | DOM parse | `wjson::parse(texto)`: construye el árbol `Value` completo. |
+| Document parse | `wjson::parse_document(texto)`: construye el documento compacto de solo lectura. |
 | SAX parse | `wjson::parse(texto, handler)` con un `Handler` vacío (validación sin árbol). |
 | SAX stream | `wjson::parse_stream()` desde un `std::istream`, en bloques de 64 KiB. |
 | Serialize | `wjson::serialize()` del árbol, en formato compacto. |
@@ -75,13 +76,21 @@ Con un archivo sintético de 137 MB (2 millones de objetos):
 | Operación | Tiempo | Memoria máxima |
 |---|---:|---:|
 | `wjson validate` (streaming) | 0.64 s | 13 MB |
-| `wjson minify` (árbol completo) | 6.7 s | 1.2 GB |
+| `wjson minify`, árbol `Value` (hasta 1.2.0) | 6.7 s | 1.2 GB |
+| `wjson minify`, `Document` compacto | 2.0 s | 763 MB |
 
-El streaming mantiene la memoria constante sea cual sea el tamaño del archivo. El árbol ocupa unas 9 veces el tamaño del JSON, porque cada valor y cada clave es un objeto independiente en el *heap*. En ese contenedor, la mayor parte del tiempo de la primera pasada se va en fallos de página del sistema operativo al pedir memoria nueva. Reducir ese consumo con un asignador tipo *arena* está en la hoja de ruta.
+Parseo en memoria del mismo archivo (sin contar los 137 MB del texto):
+
+| Representación | Tiempo | Tamaño final | Pico durante el parseo |
+|---|---:|---:|---:|
+| Árbol `Value` | 1.30 s | ~970 MB (7× el JSON) | ~970 MB |
+| `Document` compacto | 0.87 s | ~410 MB (3× el JSON) | ~550 MB |
+
+El streaming mantiene la memoria constante sea cual sea el tamaño del archivo. El árbol `Value` ocupa unas 7 veces el JSON porque cada valor y cada clave es un objeto independiente en el *heap* (40 bytes por valor, 72 por miembro). `Document` guarda cada valor en 16 bytes dentro de un único array y todos los textos en un único buffer. El pico es mayor que el tamaño final porque, al crecer, cada array convive un momento con su copia anterior.
 
 ## Próximos pasos
 
 - Comparar con otras bibliotecas (RapidJSON, nlohmann/json, simdjson) en el mismo job.
-- Reducir la memoria del DOM (hoy ~7 veces el tamaño del JSON): un `Value` más compacto o un asignador *arena*.
+- Bajar el pico de memoria de `Document` (almacenamiento por bloques en lugar de arrays que se realocan).
 - SIMD explícito (SSE2/AVX2/NEON) para buscar comillas y escapes en bloques de 16 a 32 bytes.
 - Serialización: escribir números y strings sin pasar por buffers intermedios.

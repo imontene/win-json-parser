@@ -32,7 +32,7 @@ Este documento recoge las funcionalidades propuestas para un parser de JSON orie
 | ◐ Parsing sin copias (*zero-copy*) | 🟡 | Las strings sin escapes apuntan al buffer original. *Hecho: números convertidos donde están y strings copiados por tramos. Pendiente: strings que apunten al buffer.* |
 | ◐ Aceleración SIMD (SSE4.2 / AVX2 / AVX-512, ARM64 NEON) | 🔵 | Con detección de CPU en tiempo de ejecución y *fallback* escalar. *Hecho: búsqueda de 8 en 8 bytes (SWAR, portable) y números con fast_float. Pendiente: instrucciones SIMD explícitas.* |
 | Archivos mapeados en memoria | 🟡 | `CreateFileMapping` / `MapViewOfFile` para archivos grandes. |
-| Asignador de memoria configurable | 🔵 | Arena / *pool allocator* para reducir fragmentación. |
+| ◐ Asignador de memoria configurable | 🔵 | Arena / *pool allocator* para reducir fragmentación. *Hecho: `wjson::Document`, documento compacto de solo lectura con todos los valores en un array y todos los textos en un único buffer (~2,4 veces menos memoria que `Value`). Pendiente: un `Value` modificable más compacto (requiere versión mayor).* |
 
 ## 3. Integración específica con Windows
 

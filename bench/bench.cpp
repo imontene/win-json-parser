@@ -45,7 +45,7 @@ double best_time(double min_seconds, const std::function<void()>& fn) {
 struct Row {
     std::string file;
     double size_mb;
-    double dom, sax, stream, write;
+    double dom, document, sax, stream, write;
 };
 
 }  // namespace
@@ -93,6 +93,10 @@ int main(int argc, char** argv) {
             const auto r = wjson::parse(text);
             if (!r) std::abort();
         });
+        row.document = best_time(min_seconds, [&] {
+            const auto r = wjson::parse_document(text);
+            if (!r) std::abort();
+        });
         row.sax = best_time(min_seconds, [&] {
             wjson::Handler validator;
             if (!wjson::parse(text, validator).ok()) std::abort();
@@ -110,16 +114,17 @@ int main(int argc, char** argv) {
 
     auto mbps = [](const Row& r, double seconds) { return r.size_mb / seconds; };
     if (markdown) {
-        std::printf("| File | Size (MB) | DOM parse (MB/s) | SAX parse (MB/s) | SAX stream (MB/s) | Serialize (MB/s) |\n");
-        std::printf("|---|---:|---:|---:|---:|---:|\n");
+        std::printf("| File | Size (MB) | DOM parse (MB/s) | Document parse (MB/s) | SAX parse (MB/s) | SAX stream (MB/s) | Serialize (MB/s) |\n");
+        std::printf("|---|---:|---:|---:|---:|---:|---:|\n");
         for (const auto& r : rows)
-            std::printf("| %s | %.2f | %.0f | %.0f | %.0f | %.0f |\n", r.file.c_str(), r.size_mb, mbps(r, r.dom),
-                        mbps(r, r.sax), mbps(r, r.stream), mbps(r, r.write));
+            std::printf("| %s | %.2f | %.0f | %.0f | %.0f | %.0f | %.0f |\n", r.file.c_str(), r.size_mb, mbps(r, r.dom),
+                        mbps(r, r.document), mbps(r, r.sax), mbps(r, r.stream), mbps(r, r.write));
     } else {
-        std::printf("%-22s %9s %10s %10s %10s %10s\n", "file", "MB", "dom MB/s", "sax MB/s", "stream", "write");
+        std::printf("%-22s %9s %10s %10s %10s %10s %10s\n", "file", "MB", "dom MB/s", "document", "sax MB/s", "stream",
+                    "write");
         for (const auto& r : rows)
-            std::printf("%-22s %9.2f %10.0f %10.0f %10.0f %10.0f\n", r.file.c_str(), r.size_mb, mbps(r, r.dom),
-                        mbps(r, r.sax), mbps(r, r.stream), mbps(r, r.write));
+            std::printf("%-22s %9.2f %10.0f %10.0f %10.0f %10.0f %10.0f\n", r.file.c_str(), r.size_mb, mbps(r, r.dom),
+                        mbps(r, r.document), mbps(r, r.sax), mbps(r, r.stream), mbps(r, r.write));
     }
     return 0;
 }

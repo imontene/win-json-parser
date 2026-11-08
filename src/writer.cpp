@@ -37,6 +37,43 @@ public:
         }
     }
 
+    // Same output for a compact Document value.
+    void write(ValueRef v, int level) {
+        switch (v.type()) {
+            case Type::Null: out_ += "null"; break;
+            case Type::Boolean: out_ += v.as_bool() ? "true" : "false"; break;
+            case Type::Integer: write_integer(v.as_integer()); break;
+            case Type::Double: write_double(v.as_double()); break;
+            case Type::String: write_string(v.as_string()); break;
+            case Type::Array: {
+                const std::size_t n = v.size();
+                out_.push_back('[');
+                for (std::size_t i = 0; i < n; ++i) {
+                    if (i > 0) out_.push_back(',');
+                    newline(level + 1);
+                    write(v[i], level + 1);
+                }
+                if (n > 0) newline(level);
+                out_.push_back(']');
+                break;
+            }
+            case Type::Object: {
+                const std::size_t n = v.size();
+                out_.push_back('{');
+                for (std::size_t i = 0; i < n; ++i) {
+                    if (i > 0) out_.push_back(',');
+                    newline(level + 1);
+                    write_string(v.key(i));
+                    out_ += pretty() ? ": " : ":";
+                    write(v.value(i), level + 1);
+                }
+                if (n > 0) newline(level);
+                out_.push_back('}');
+                break;
+            }
+        }
+    }
+
 private:
     bool pretty() const noexcept { return options_.indent > 0; }
 
@@ -139,6 +176,12 @@ private:
 };
 
 }  // namespace
+
+std::string serialize(ValueRef value, const WriteOptions& options) {
+    Writer writer(options);
+    writer.write(value, 0);
+    return writer.take();
+}
 
 std::string serialize(const Value& value, const WriteOptions& options) {
     Writer writer(options);
