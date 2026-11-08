@@ -86,4 +86,5 @@ function Test-Scenario([string] $Name, [string[]] $Arguments, [string] $Expected
 Test-Scenario 'valid' @((Join-Path $Samples 'sample.json'), '--pointer', '/tiendas/2/ciudad') 'sample.json'
 Test-Scenario 'invalid' @((Join-Path $Samples 'invalid.json')) 'invalid.json'
 Test-Scenario 'spanish-jsonc' @((Join-Path $Samples 'settings.jsonc'), '--lang', 'es') 'settings.jsonc'
+Test-Scenario 'compare' @((Join-Path $Samples 'sample.json'), '--compare', (Join-Path $Samples 'sample-v2.json'), '--lang', 'es') 'sample.json'
 Write-Host 'Smoke test passed'

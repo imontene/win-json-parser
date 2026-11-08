@@ -54,6 +54,17 @@ namespace Wjson.Viewer.Core
             ["SaveFailed"] = ("Could not save the file", "No se pudo guardar el archivo"),
             ["Ok"] = ("OK", "Aceptar"),
             ["DropHint"] = ("Open a file or drop it here", "Abre un archivo o suéltalo aquí"),
+            ["Compare"] = ("Compare", "Comparar"),
+            ["CompareTooltip"] = ("Compare with another file", "Comparar con otro archivo"),
+            ["CompareTitle"] = ("Differences with {0}", "Diferencias con {0}"),
+            ["CompareEqual"] = ("The documents are equal.", "Los documentos son iguales."),
+            ["DiffSummary"] = ("{0:N0} added, {1:N0} removed, {2:N0} changed", "{0:N0} añadidos, {1:N0} eliminados, {2:N0} cambiados"),
+            ["DiffTruncated"] = ("Showing the first {0:N0} differences.", "Se muestran las primeras {0:N0} diferencias."),
+            ["DiffHint"] = ("Select a difference to show it in the tree.", "Selecciona una diferencia para verla en el árbol."),
+            ["CompareNeedsValid"] = ("Fix the errors in the current document before comparing.",
+                                     "Corrige los errores del documento actual antes de comparar."),
+            ["OtherInvalid"] = ("{0} is not valid JSON: {1}", "{0} no es JSON válido: {1}"),
+            ["Close"] = ("Close", "Cerrar"),
         };
 
         private static readonly Dictionary<JsonErrorCode, string> SpanishErrors = new()

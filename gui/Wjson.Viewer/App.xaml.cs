@@ -41,7 +41,7 @@ namespace Wjson.Viewer
         }
 
         /// <summary>
-        /// Command line: WjsonViewer.exe [file] [--pointer /json/pointer] [--lang es|en]
+        /// Command line: WjsonViewer.exe [file] [--pointer /json/pointer] [--compare other.json] [--lang es|en]
         /// </summary>
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
@@ -113,10 +113,12 @@ namespace Wjson.Viewer
         {
             string? file = null;
             string? pointer = null;
+            string? compare = null;
             var argv = Environment.GetCommandLineArgs();
             for (var i = 1; i < argv.Length; ++i)
             {
                 if (argv[i] == "--pointer" && i + 1 < argv.Length) pointer = argv[++i];
+                else if (argv[i] == "--compare" && i + 1 < argv.Length) compare = argv[++i];
                 else if (argv[i] == "--lang" && i + 1 < argv.Length) SetLanguage(argv[++i]);
                 else file ??= argv[i];
             }
@@ -124,6 +126,7 @@ namespace Wjson.Viewer
             _window = new MainWindow();
             _window.Activate();
             if (file != null) await _window.OpenFileAsync(Path.GetFullPath(file), pointer);
+            if (file != null && compare != null) await _window.CompareWithAsync(Path.GetFullPath(compare));
         }
     }
 }

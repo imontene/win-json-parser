@@ -5,6 +5,31 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid x:Name="Root" AllowDrop="True" DragOver="Root_DragOver" Drop="Root_Drop">
+        <Grid.Resources>
+            <!-- One row of the comparison results (DiffItem in MainWindow.xaml.cs). -->
+            <DataTemplate x:Key="DiffItemTemplate">
+                <Grid ColumnSpacing="10" Padding="0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Text="{Binding Mark}"
+                        Foreground="{Binding MarkBrush}"
+                        FontFamily="Cascadia Mono, Consolas"
+                        FontWeight="Bold"
+                        VerticalAlignment="Top" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding Pointer}" FontFamily="Cascadia Mono, Consolas" TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            Text="{Binding Detail}"
+                            FontFamily="Cascadia Mono, Consolas"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </DataTemplate>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -41,6 +66,12 @@
             </AppBarButton>
             <AppBarSeparator />
             <AppBarToggleButton x:Name="JsoncToggle" Icon="Comment" Click="Jsonc_Click" />
+            <AppBarSeparator />
+            <AppBarButton x:Name="CompareButton" Click="Compare_Click">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE8AB;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
         </CommandBar>
 
         <!-- Editor | tree -->

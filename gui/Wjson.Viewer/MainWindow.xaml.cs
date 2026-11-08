@@ -41,6 +41,31 @@ namespace Wjson.Viewer
         public override string ToString() => Node.Kind == NodeKind.Range ? Label : Label + ":  " + ValueText;
     }
 
+    /// <summary>One row of the comparison results (bound from DiffItemTemplate).</summary>
+    [Microsoft.UI.Xaml.Data.Bindable]
+    public sealed class DiffItem
+    {
+        public DiffItem(DiffEntry entry, Brush markBrush)
+        {
+            Entry = entry;
+            MarkBrush = markBrush;
+            Mark = entry.Kind switch { DiffKind.Added => "+", DiffKind.Removed => "\u2212", _ => "~" };
+            Pointer = entry.Pointer.Length == 0 ? "\"\"" : entry.Pointer;
+            Detail = entry.Kind switch
+            {
+                DiffKind.Added => JsonDiff.Preview(entry.Right),
+                DiffKind.Removed => JsonDiff.Preview(entry.Left),
+                _ => JsonDiff.Preview(entry.Left, 40) + "  \u2192  " + JsonDiff.Preview(entry.Right, 40),
+            };
+        }
+
+        public DiffEntry Entry { get; }
+        public string Mark { get; }
+        public Brush MarkBrush { get; }
+        public string Pointer { get; }
+        public string Detail { get; }
+    }
+
     public sealed partial class MainWindow : Window
     {
         private readonly DispatcherQueueTimer _validateTimer;
@@ -103,6 +128,7 @@ namespace Wjson.Viewer
             Set(SaveAsButton, "SaveAs");
             Set(FormatButton, "Format");
             Set(MinifyButton, "Minify");
+            Set(CompareButton, "Compare", "CompareTooltip");
             JsoncToggle.Label = Strings.Get("Jsonc");
             ToolTipService.SetToolTip(JsoncToggle, Strings.Get("JsoncTooltip"));
             PointerBox.PlaceholderText = Strings.Get("PointerPlaceholder");
@@ -396,6 +422,7 @@ namespace Wjson.Viewer
 
             GoToErrorButton.Visibility = result != null && !result.IsValid && _largeFile == null ? Visibility.Visible : Visibility.Collapsed;
             FormatButton.IsEnabled = MinifyButton.IsEnabled = valid && _largeFile == null;
+            CompareButton.IsEnabled = valid && result!.Root != null;
             SaveButton.IsEnabled = SaveAsButton.IsEnabled = _largeFile == null;
 
             var info = new List<string>();
@@ -426,6 +453,116 @@ namespace Wjson.Viewer
             var index = TextPositions.IndexOf(text, error.Line, error.Column);
             Editor.Focus(FocusState.Programmatic);
             Editor.Select(index, index < text.Length ? 1 : 0);
+        }
+
+        // ------------------------------------------------------------------
+        // Compare
+        // ------------------------------------------------------------------
+
+        private async void Compare_Click(object sender, RoutedEventArgs e)
+        {
+            var picker = new FileOpenPicker();
+            picker.FileTypeFilter.Add(".json");
+            picker.FileTypeFilter.Add(".jsonc");
+            picker.FileTypeFilter.Add("*");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            var file = await picker.PickSingleFileAsync();
+            if (file != null) await CompareWithAsync(file.Path);
+        }
+
+        /// <summary>Compares the current document (left) with another file (right) and shows the differences.</summary>
+        public async Task CompareWithAsync(string otherPath)
+        {
+            var left = _result?.Root;
+            if (_result?.IsValid != true || left == null)
+            {
+                await ShowMessageAsync(Strings.Get("Compare"), Strings.Get("CompareNeedsValid"));
+                return;
+            }
+
+            var name = Path.GetFileName(otherPath);
+            var options = DocumentAnalysis.Options(Jsonc);
+            DiffResult diff;
+            try
+            {
+                diff = await Task.Run(() => JsonDiff.Compare(left.Value, WJson.ParseFile(otherPath, options)));
+            }
+            catch (JsonParseException ex)
+            {
+                var where = ex.Error.Line > 0 ? Strings.Format("ErrorAt", ex.Error.Line, ex.Error.Column, Strings.Error(ex.Error))
+                                              : Strings.Error(ex.Error);
+                await ShowMessageAsync(Strings.Get("Compare"), Strings.Format("OtherInvalid", name, where));
+                return;
+            }
+            catch (Exception ex)
+            {
+                await ShowMessageAsync(Strings.Get("OpenFailed"), ex.Message);
+                return;
+            }
+            await ShowDiffAsync(diff, name);
+        }
+
+        private async Task ShowDiffAsync(DiffResult diff, string otherName)
+        {
+            var panel = new StackPanel { Spacing = 8 };
+            var dialog = new ContentDialog
+            {
+                Title = Strings.Format("CompareTitle", otherName),
+                Content = panel,
+                CloseButtonText = Strings.Get("Close"),
+                XamlRoot = Content.XamlRoot,
+            };
+            dialog.Resources["ContentDialogMaxWidth"] = 900.0;
+
+            if (diff.AreEqual)
+            {
+                panel.Children.Add(new TextBlock { Text = Strings.Get("CompareEqual") });
+                await dialog.ShowAsync();
+                return;
+            }
+
+            var summary = Strings.Format("DiffSummary", diff.Count(DiffKind.Added), diff.Count(DiffKind.Removed),
+                                         diff.Count(DiffKind.Changed));
+            if (diff.Truncated) summary += "  " + Strings.Format("DiffTruncated", JsonDiff.MaxEntries);
+            panel.Children.Add(new TextBlock { Text = summary, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            panel.Children.Add(new TextBlock { Text = Strings.Get("DiffHint"), Foreground = SecondaryTextBrush });
+
+            var added = BrushFor(NodeKind.String);
+            var removed = CriticalBrush;
+            var changed = BrushFor(NodeKind.Number);
+            var items = diff.Entries.Select(entry => new DiffItem(entry, entry.Kind switch
+            {
+                DiffKind.Added => added,
+                DiffKind.Removed => removed,
+                _ => changed,
+            })).ToList();
+
+            var list = new ListView
+            {
+                ItemsSource = items,
+                ItemTemplate = (DataTemplate)Root.Resources["DiffItemTemplate"],
+                IsItemClickEnabled = true,
+                SelectionMode = ListViewSelectionMode.None,
+                MaxHeight = 420,
+                MinWidth = 640,
+            };
+            list.ItemClick += (_, args) =>
+            {
+                if (args.ClickedItem is not DiffItem item) return;
+                dialog.Hide();
+                // Added values exist only in the other file: show where they would go.
+                var pointer = item.Entry.LeftPointer ?? ParentPointer(item.Entry.RightPointer ?? "");
+                NavigateTo(pointer);
+            };
+            panel.Children.Add(list);
+            await dialog.ShowAsync();
+        }
+
+        // "/a/b/3" -> "/a/b"; the parent of a top-level member is the root "".
+        private static string ParentPointer(string pointer)
+        {
+            var slash = pointer.LastIndexOf('/');
+            return slash <= 0 ? "" : pointer.Substring(0, slash);
         }
 
         // ------------------------------------------------------------------

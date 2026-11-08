@@ -275,3 +275,135 @@ public class WriterTests
         Assert.Equal(WJson.Minify(json), JsonWriter.Write(value, 0));
     }
 }
+
+public class DiffTests
+{
+    private static DiffResult Diff(string left, string right) => JsonDiff.Compare(WJson.Parse(left), WJson.Parse(right));
+
+    [Fact]
+    public void Equal_documents_have_no_differences()
+    {
+        Assert.True(Diff("{\"a\": [1, 2], \"b\": null}", "{\"b\": null, \"a\": [1, 2.0]}").AreEqual); // order and 1 vs 1.0 don't matter
+        Assert.True(Diff("[]", "[]").AreEqual);
+    }
+
+    [Fact]
+    public void Object_members_added_removed_and_changed()
+    {
+        var r = Diff("{\"keep\": 1, \"old\": true, \"nested\": {\"x\": \"a\"}}",
+                     "{\"keep\": 1, \"new\": [1], \"nested\": {\"x\": \"b\"}}");
+        Assert.Equal(3, r.Entries.Count);
+        var removed = Assert.Single(r.Entries, e => e.Kind == DiffKind.Removed);
+        Assert.Equal("/old", removed.LeftPointer);
+        Assert.Null(removed.RightPointer);
+        var added = Assert.Single(r.Entries, e => e.Kind == DiffKind.Added);
+        Assert.Equal("/new", added.RightPointer);
+        Assert.Null(added.LeftPointer);
+        var changed = Assert.Single(r.Entries, e => e.Kind == DiffKind.Changed);
+        Assert.Equal("/nested/x", changed.Pointer);
+        Assert.Equal("a", changed.Left);
+        Assert.Equal("b", changed.Right);
+    }
+
+    [Fact]
+    public void Insertion_in_the_middle_of_an_array_is_one_addition()
+    {
+        var r = Diff("[1, 2, 3, 4, 5]", "[1, 2, 99, 3, 4, 5]");
+        var entry = Assert.Single(r.Entries);
+        Assert.Equal(DiffKind.Added, entry.Kind);
+        Assert.Equal("/2", entry.RightPointer);
+        Assert.Equal(99L, entry.Right);
+
+        var removal = Assert.Single(Diff("[{\"id\": 1}, {\"id\": 2}, {\"id\": 3}]", "[{\"id\": 1}, {\"id\": 3}]").Entries);
+        Assert.Equal(DiffKind.Removed, removal.Kind);
+        Assert.Equal("/1", removal.LeftPointer);
+    }
+
+    [Fact]
+    public void Modified_array_elements_are_compared_in_depth()
+    {
+        var r = Diff("[{\"id\": 1, \"name\": \"a\"}, {\"id\": 2, \"name\": \"b\"}]",
+                     "[{\"id\": 1, \"name\": \"a\"}, {\"id\": 2, \"name\": \"B\"}]");
+        var entry = Assert.Single(r.Entries);
+        Assert.Equal(DiffKind.Changed, entry.Kind);
+        Assert.Equal("/1/name", entry.LeftPointer);
+        Assert.Equal("/1/name", entry.RightPointer);
+    }
+
+    [Fact]
+    public void Type_changes_and_root_values()
+    {
+        var entry = Assert.Single(Diff("{\"a\": [1]}", "{\"a\": {\"0\": 1}}").Entries);
+        Assert.Equal(DiffKind.Changed, entry.Kind);
+        Assert.Equal("/a", entry.Pointer);
+        Assert.Equal("", Assert.Single(Diff("1", "2").Entries).Pointer);
+    }
+
+    [Fact]
+    public void Pointers_escape_keys()
+    {
+        var entry = Assert.Single(Diff("{\"a/b\": {\"m~n\": 1}}", "{\"a/b\": {\"m~n\": 2}}").Entries);
+        Assert.Equal("/a~1b/m~0n", entry.Pointer);
+    }
+
+    [Fact]
+    public void Numbers_compare_exactly()
+    {
+        Assert.True(JsonDiff.DeepEquals(1L, 1.0));
+        Assert.True(JsonDiff.DeepEquals(0L, -0.0));
+        Assert.False(JsonDiff.DeepEquals(9007199254740993L, 9007199254740992.0)); // no rounding through double
+        Assert.False(JsonDiff.DeepEquals(1L, 1.5));
+        Assert.False(JsonDiff.DeepEquals(1L, "1"));
+    }
+
+    [Fact]
+    public void Large_arrays_fall_back_to_positions_and_results_are_capped()
+    {
+        var left = "[" + string.Join(",", Enumerable.Range(0, 3000)) + "]";
+        var right = "[" + string.Join(",", Enumerable.Range(0, 3000).Select(i => i + 1)) + "]";
+        var r = Diff(left, right);
+        Assert.False(r.AreEqual);  // 3000 x 3000 exceeds MaxAlignmentCells: compared by position
+
+        var many = "{" + string.Join(",", Enumerable.Range(0, JsonDiff.MaxEntries + 50).Select(i => $"\"k{i}\": {i}")) + "}";
+        var capped = Diff(many, "{}");
+        Assert.True(capped.Truncated);
+        Assert.Equal(JsonDiff.MaxEntries, capped.Entries.Count);
+    }
+
+    [Fact]
+    public void Previews_are_short()
+    {
+        Assert.Equal("[1,2]", JsonDiff.Preview(WJson.Parse("[1, 2]")));
+        Assert.EndsWith("…", JsonDiff.Preview(new string('x', 200)));
+    }
+}
+
+public class SampleDiffTests
+{
+    private static string Sample(string name)
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, "gui", "samples", name);
+            if (File.Exists(candidate)) return candidate;
+        }
+        throw new FileNotFoundException(name);
+    }
+
+    [Fact]
+    public void Sample_files_differ_in_exactly_the_expected_places()
+    {
+        var r = JsonDiff.Compare(WJson.ParseFile(Sample("sample.json")), WJson.ParseFile(Sample("sample-v2.json")));
+        var found = r.Entries.Select(e => $"{e.Kind} {e.Pointer}").OrderBy(s => s, StringComparer.Ordinal).ToArray();
+        Assert.Equal(new[]
+        {
+            "Added /repositorio",
+            "Added /tiendas/5",
+            "Changed /configuracion/indentacion",
+            "Changed /tiendas/2/ciudad",
+            "Changed /version",
+            "Removed /lecturas/2499",
+            "Removed /licencia",
+        }, found);
+    }
+}
