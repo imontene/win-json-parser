@@ -16,7 +16,7 @@ Contexto para trabajar en este repositorio. El usuario escribe en español: resp
 | `src/document.cpp` | `Document` compacto: `DocumentBuilder` (otro *sink* de `Reader`) y `ValueRef`. |
 | `src/c_api.cpp` | API C sobre la C++. Ninguna excepción cruza la frontera. |
 | `src/third_party/fast_float/` | fast_float v8.3.2 *vendorizado* (conversión de doubles). |
-| `cli/` | `wjson.exe`: `validate`, `format`, `minify`, `query`. |
+| `cli/` | `wjson.exe`: `validate`, `format`, `minify`, `query`, `diff` (`cli/diff.cpp`, probado en `tests/test_diff.cpp`). |
 | `bindings/dotnet/` | Binding .NET (P/Invoke). Ensamblado `Imontene.Wjson.dll`. |
 | `bindings/powershell/` | Módulo `Wjson` (5.1 y 7) y tests Pester. |
 | `gui/` | **wjson Viewer** (WinUI 3): `Wjson.Viewer.Core` (lógica, testeable en cualquier SO), `Wjson.Viewer` (ventana). |
@@ -47,6 +47,7 @@ Linux: presets `linux-gcc` y `linux-clang-sanitize` (ASan + UBSan).
   Por defecto usa el NuGet publicado; con `-p:WjsonLocalNative=<wjson.dll>` usa el binding y la DLL del repositorio.
   Tests de la lógica: `dotnet test gui/Wjson.Viewer.Core.Tests` (funcionan también en Linux).
   Prueba de humo con capturas: `gui/tests/smoke.ps1 -Exe <WjsonViewer.exe> -Samples gui/samples`.
+  Incluye `WjsonViewer.exe gui/samples/sample.json --self-test log.txt` (`MainWindow.SelfTest.cs`): comprobaciones del editor dentro de la app.
 
 ## Convenciones
 
@@ -79,7 +80,7 @@ Linux: presets `linux-gcc` y `linux-clang-sanitize` (ASan + UBSan).
 - **GUI sin empaquetar**: necesita `EnableMsixTooling=true` en el `.csproj` para generar `resources.pri`; sin él los controles WinUI (p. ej. `TreeView`) fallan al cargar con `XamlParseException` genérica.
 - **Fuentes en XAML**: se ponen directamente (`FontFamily="Cascadia Mono, Consolas"`); un `StaticResource` propio de `FontFamily` en `App.xaml` hacía fallar la carga.
 - **Diagnóstico de la GUI**: las excepciones no controladas se escriben en `%LOCALAPPDATA%\wjson\viewer.log` (o `WJSON_VIEWER_LOG`). Si falla la carga de `MainWindow.xaml`, `App.ProbeXaml` registra qué elemento falla.
-- **`TextBox` de WinUI** guarda los saltos de línea como `\r`; `DocumentFile.Save` restaura LF/CRLF y la codificación original.
+- **Editor del visor** (`RichEditBox`): guarda los saltos de línea como `\r` (`DocumentFile.Save` restaura LF/CRLF y la codificación); en solo lectura ignora `SetText`; tiene `UndoLimit = 0` porque colorear ensuciaría su historial (el historial es `EditHistory`); los colores se cargan como RTF y se repintan por líneas (`JsonSyntax`).
 - **Ensamblado .NET**: se llama `Imontene.Wjson.dll`, no `Wjson.dll`, porque en Windows chocaría con el nativo `wjson.dll` (mayúsculas indistintas).
 - **Runtime de MSVC**: la biblioteca usa `/MD` (lo que esperan los consumidores); solo `wjson.exe` usa `/MT`, compilando dentro las fuentes de la biblioteca. La DLL para NuGet se compila con `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded`.
 - **PDB**: la biblioteca usa `COMPILE_PDB_NAME wjson_lib` para no pisar `wjson.pdb` del CLI en Debug.
@@ -97,4 +98,4 @@ Linux: presets `linux-gcc` y `linux-clang-sanitize` (ASan + UBSan).
 
 ## Pendiente
 
-Ver `docs/FEATURES.md`. Lo más inmediato: enviar winget, bajar el pico de memoria de `Document`, SIMD explícito, mejoras del visor (resaltado, enlazar árbol y texto, progreso al abrir archivos enormes), `wjson diff` en el CLI y firma de código de los ejecutables.
+Ver `docs/FEATURES.md`. Lo más inmediato: enviar winget, firma de código de los ejecutables, porcentaje de progreso al abrir archivos enormes (necesita un callback de progreso en la API C), `--in-place` en `format`/`minify` y salida de `diff` como JSON Patch.

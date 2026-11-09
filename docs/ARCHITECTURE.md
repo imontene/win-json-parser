@@ -91,19 +91,24 @@ La GUI es una aplicación **WinUI 3** (Windows App SDK 1.8) escrita en C#, que u
 | `gui/Wjson.Viewer.Core` | Lógica sin interfaz, que se prueba en cualquier sistema: árbol perezoso (los hijos se crean al expandir, y los contenedores de más de 1000 elementos se dividen en rangos), navegación por JSON Pointer, conversión de línea y columna a posición en el texto, carga y guardado que respetan codificación y finales de línea, modo streaming para archivos grandes, textos en español e inglés (incluidos los errores del parser, traducidos por su código) y un serializador para copiar nodos. |
 | `gui/Wjson.Viewer.Core.Tests` | Tests de xUnit de la lógica. |
 | `gui/Wjson.Viewer` | La ventana (XAML y code-behind): editor, árbol, barra de estado, abrir, guardar y arrastrar archivos. |
-| `gui/tests/smoke.ps1` | Prueba de humo del CI: abre la app con archivos de ejemplo, comprueba que la ventana aparece y captura pantallas. |
+| `gui/tests/smoke.ps1` | Prueba de humo del CI: ejecuta el autotest de la app, la abre con archivos de ejemplo (y con uno de 110 MB), comprueba que la ventana aparece y captura pantallas. |
 
 Algunos detalles:
 
 - **Aplicación sin empaquetar y autocontenida**: no necesita instalar .NET ni el runtime de Windows App SDK; basta con descomprimir el zip. `EnableMsixTooling` debe seguir activado, porque genera el `resources.pri` del que dependen los controles de WinUI.
 - **Validación en vivo**: el texto se valida en segundo plano 350 ms después de la última pulsación. Cuando hay un error, el árbol conserva la última versión válida, atenuada.
 - **Archivos grandes** (más de 8 MB): se abren en solo lectura y se validan en streaming, sin cargar el texto en el editor. A partir de 256 MB tampoco se construye el árbol.
-- **Finales de línea**: el `TextBox` de WinUI guarda los saltos de línea como `\r`. Al guardar se restauran los del archivo original (LF o CRLF).
+- **Finales de línea**: el editor (un `RichEditBox`) guarda los saltos de línea como `\r`. Al guardar se restauran los del archivo original (LF o CRLF).
+- **Resaltado de sintaxis** (`JsonSyntax`): un tokenizador tolerante (colorea también JSON incompleto) da los tramos de color. Un documento entero se carga como RTF ya coloreado, en una sola llamada; tras cada edición solo se repintan las líneas cuyo color cambia (`RepaintRange` compara los tramos de antes y de después). Por encima de 2 millones de caracteres no se colorea.
+- **Deshacer/rehacer** (`EditHistory`): lo lleva la ventana, porque colorear cambia el formato y el historial propio del control lo registraría como pasos. Agrupa lo escrito por palabras; Formatear y Minificar son un solo paso.
+- **Árbol y texto enlazados** (`JsonLocator`): convierte una posición del texto en el JSON Pointer del valor que hay debajo, y un puntero en el rango de texto de su valor, recorriendo el texto sin construir ningún árbol.
+- **Progreso**: abrir o comparar archivos grandes muestra la fase y el tiempo transcurrido, y se puede cancelar.
+- **Autotest**: `WjsonViewer.exe sample.json --self-test log.txt` ejecuta dentro de la app comprobaciones del editor (colores, escritura, deshacer, enlace con el árbol); el CI lo ejecuta en la prueba de humo.
 - **Idioma**: el de Windows, o el que se indique con `--lang es` / `--lang en`.
 
 - **Comparación** (`JsonDiff` en `Wjson.Viewer.Core`): objetos por clave, arrays alineados con la subsecuencia común más larga (sobre identificadores de una forma canónica de cada elemento, para comparar enteros y no subárboles) y números por valor. A partir de 4 millones de celdas de alineación, los arrays se comparan por posición; los resultados se limitan a 10 000.
 
-Pendiente: resaltado de sintaxis en el editor, enlace entre la selección del árbol y el texto, y progreso y cancelación al abrir archivos muy grandes.
+Pendiente: porcentaje de progreso al abrir archivos grandes (la API en C no informa del avance).
 
 ## Capas para otros lenguajes
 

@@ -25,16 +25,17 @@ Consulta la hoja de ruta en [docs/FEATURES.md](docs/FEATURES.md), el diseño en 
 
 ## wjson Viewer
 
-![wjson Viewer mostrando un documento con el árbol expandido hasta /tiendas/2/ciudad](docs/images/viewer.png)
+![wjson Viewer: el editor con resaltado de sintaxis y el valor de /tiendas/2/ciudad seleccionado a la vez en el texto y en el árbol](docs/images/viewer.png)
 
 Aplicación de escritorio para Windows 10 y 11 (WinUI 3):
 
-- **Editor** con validación mientras escribes. Los errores indican línea y columna, y el enlace **Ir al error** lleva a la posición exacta.
+- **Editor** con resaltado de sintaxis y validación mientras escribes. Los errores indican línea y columna, y el enlace **Ir al error** lleva a la posición exacta.
 - **Árbol** del documento con valores coloreados por tipo. Los arrays grandes se dividen en rangos de 1000 elementos.
+- **Árbol y texto enlazados**: al seleccionar un nodo se selecciona su valor en el texto, y al mover el cursor por el texto se selecciona su nodo.
 - **Búsqueda con JSON Pointer**: escribe `/tiendas/2/ciudad` y se expande el árbol hasta ese valor. Puedes copiar el puntero o el valor de cualquier nodo.
 - **Formatear**, **minificar** y modo **JSONC**, que se activa solo con los archivos `.jsonc`.
 - Conserva la codificación (UTF-8, UTF-8 con BOM, UTF-16) y los finales de línea al guardar.
-- Los archivos de más de 8 MB se abren en solo lectura y se validan en streaming.
+- Los archivos de más de 8 MB se abren en solo lectura y se validan en streaming, con un panel de progreso que permite cancelar.
 - **Comparar** con otro archivo: lista lo añadido, eliminado y cambiado, y al seleccionar una diferencia la muestra en el árbol.
 - Abrir, guardar y arrastrar archivos. Interfaz en español o inglés, según Windows.
 
@@ -53,11 +54,20 @@ wjson format --indent 4 data.json          # formatear
 wjson minify data.json > data.min.json     # compactar
 wjson query /items/0/name data.json        # extraer un valor (JSON Pointer)
 wjson query --raw /version package.json    # string sin comillas
+wjson diff v1.json v2.json                 # diferencias (orden de claves y formato no importan)
 wjson validate --jsonc settings.json       # aceptar comentarios y comas finales
 type data.json | wjson format              # leer desde stdin
 ```
 
-Códigos de salida: `0` correcto, `1` JSON inválido, `2` error de uso o de E/S, `3` el puntero de `query` no existe.
+Códigos de salida: `0` correcto (en `diff`, documentos iguales), `1` JSON inválido, `2` error de uso o de E/S, `3` el puntero de `query` no existe, `4` los documentos de `diff` son distintos.
+
+`diff` escribe una línea por diferencia:
+
+```text
+~ /version: "1.1.0" -> "1.3.0"
+- /licencia: null
++ /tiendas/5: {"id":99,"ciudad":"Córdoba","ventas":1234.5,"abierta":true,...}
+```
 
 Ejemplo de error:
 

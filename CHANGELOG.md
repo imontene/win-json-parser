@@ -5,10 +5,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). E
 ## [Sin publicar]
 
 ### Añadido
+- **`wjson diff a.json b.json`** en el CLI: muestra una línea por diferencia (`+ /puntero: valor`, `- /puntero: valor` o `~ /puntero: antes -> después`) con las mismas reglas que la comparación del visor. Código de salida `4` si los documentos difieren y `0` si son iguales; `--quiet` solo devuelve el código.
+- **Resaltado de sintaxis en wjson Viewer**: claves, strings, números, `true`/`false`/`null` y comentarios en colores distintos, en tema claro y oscuro. También colorea el JSON a medio escribir o con errores. Los documentos de más de 2 millones de caracteres se muestran sin colores.
+- **Árbol y texto enlazados**: al seleccionar un nodo se selecciona su valor en el editor, y al mover el cursor por el texto se selecciona en el árbol el valor que hay debajo.
+- **Progreso al abrir archivos grandes**: un panel muestra la fase (validando, leyendo los valores, construyendo el árbol) y el tiempo transcurrido, con un botón para cancelar. También al comparar con un archivo grande.
 - **Comparar archivos en wjson Viewer**: botón *Comparar* (y argumento `--compare otro.json`) que lista lo añadido, eliminado y cambiado entre el documento abierto y otro archivo, con su JSON Pointer; al seleccionar una diferencia se muestra en el árbol. Los objetos se comparan por clave, sin importar el orden; los arrays se alinean para que un elemento insertado en medio cuente como una sola diferencia; y los números se comparan por valor (`1` es igual a `1.0`).
 - **`wjson::Document`**: documento compacto de solo lectura (`parse_document`, `parse_document_file`, `parse_document_stream`), con acceso mediante `ValueRef` (`find`, `at_pointer`, índices, `to_value()`) y `serialize(ValueRef)`. Ocupa unas 2,4 veces menos memoria que el árbol `Value` y se construye 1,4 veces más rápido. La API existente no cambia.
 
 ### Cambiado
+- El editor del visor tiene su propio historial de deshacer/rehacer (Ctrl+Z, Ctrl+Y, Ctrl+Mayús+Z): agrupa lo escrito por palabras, y Formatear o Minificar se deshacen en un solo paso. Pegar inserta siempre texto sin formato.
 - El CLI usa `Document` en `format`, `minify` y `query`: con un archivo de 137 MB, la memoria máxima baja de 1,2 GB a 760 MB.
 - Búsqueda con SSE2 (x86/x64) del final de los strings y de los espacios, de 16 en 16 bytes: entre un 20 % y un 30 % más rápido en documentos con mucho texto o indentación. En otras arquitecturas se mantiene la versión portable de 8 en 8 bytes.
 

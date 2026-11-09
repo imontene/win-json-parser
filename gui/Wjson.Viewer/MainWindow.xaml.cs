@@ -269,6 +269,7 @@ namespace Wjson.Viewer
             _cleanText = _text;
             _dirty = false;
             UpdateTitle();
+            if (_largeFile != null) ShowResult(null); // size and encoding in the status bar while it validates
             await ValidateAsync();
             if (!string.IsNullOrEmpty(pointer)) NavigateTo(pointer!);
         }
