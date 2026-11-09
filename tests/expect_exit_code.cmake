@@ -1,0 +1,16 @@
+# Runs CLI with the arguments that follow the script and checks its exit code:
+#   cmake -DCLI=<exe> -DEXPECTED=<code> -P expect_exit_code.cmake <args...>
+set(args)
+set(collect OFF)
+math(EXPR last "${CMAKE_ARGC} - 1")
+foreach(i RANGE 1 ${last})
+    if(collect)
+        list(APPEND args "${CMAKE_ARGV${i}}")
+    elseif(CMAKE_ARGV${i} MATCHES "expect_exit_code\\.cmake$")
+        set(collect ON)
+    endif()
+endforeach()
+execute_process(COMMAND "${CLI}" ${args} RESULT_VARIABLE result)
+if(NOT result EQUAL EXPECTED)
+    message(FATAL_ERROR "exit code ${result}, expected ${EXPECTED}")
+endif()

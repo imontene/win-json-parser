@@ -33,8 +33,13 @@ add_executable(wjson_tests
     test_pointer.cpp
     test_streaming.cpp
     test_writer.cpp
+    # `wjson diff` logic; it only uses the public API.
+    test_diff.cpp
+    ${PROJECT_SOURCE_DIR}/cli/diff.cpp
 )
 target_link_libraries(wjson_tests PRIVATE wjson::wjson)
+target_include_directories(wjson_tests PRIVATE "${PROJECT_SOURCE_DIR}/cli")
+target_compile_definitions(wjson_tests PRIVATE WJSON_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 target_include_directories(wjson_tests SYSTEM PRIVATE "${WJSON_DOCTEST_INCLUDE_DIR}")
 set_target_properties(wjson_tests PROPERTIES CXX_EXTENSIONS OFF)
 wjson_set_compiler_options(wjson_tests)
@@ -95,4 +100,18 @@ if(WJSON_BUILD_CLI)
     set_tests_properties(cli.jsonc_strict PROPERTIES WILL_FAIL TRUE)
     add_test(NAME cli.jsonc
              COMMAND wjson_cli validate --jsonc ${CMAKE_CURRENT_SOURCE_DIR}/data/settings.jsonc)
+
+    # diff: exit code 0 when equal, 4 when the documents differ.
+    set(samples ${PROJECT_SOURCE_DIR}/gui/samples)
+    add_test(NAME cli.diff_equal COMMAND wjson_cli diff ${samples}/sample.json ${samples}/sample.json)
+    add_test(NAME cli.diff COMMAND wjson_cli diff ${samples}/sample.json ${samples}/sample-v2.json)
+    set_tests_properties(cli.diff PROPERTIES
+        PASS_REGULAR_EXPRESSION "~ /version: \"1.1.0\" -> \"1.3.0\"")
+    add_test(NAME cli.diff_exit_code
+             COMMAND ${CMAKE_COMMAND} -DCLI=$<TARGET_FILE:wjson_cli> -DEXPECTED=4
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/expect_exit_code.cmake
+                     diff --quiet ${samples}/sample.json ${samples}/sample-v2.json)
+    add_test(NAME cli.diff_invalid
+             COMMAND wjson_cli diff ${samples}/sample.json ${samples}/invalid.json)
+    set_tests_properties(cli.diff_invalid PROPERTIES WILL_FAIL TRUE)
 endif()

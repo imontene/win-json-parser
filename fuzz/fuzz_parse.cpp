@@ -9,6 +9,8 @@
 //      compact and pretty form.
 //   4. The C API agrees with the C++ API.
 //   5. The compact Document agrees with the Value tree.
+//   6. `wjson diff` finds no difference between a document and its
+//      pretty-printed round trip.
 //
 // The first input byte selects the parse options, so the fuzzer also explores
 // JSONC, depth limits and stream buffer sizes.
@@ -21,6 +23,7 @@
 #include <string>
 #include <string_view>
 
+#include "diff.hpp"
 #include "wjson/wjson.h"
 #include "wjson/wjson.hpp"
 
@@ -89,6 +92,15 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         if (wjson::serialize(document.document->root()) != wjson::serialize(*dom.value))
             violated("Document serializes differently from Value");
         (void)document.document->root().at_pointer(text);
+
+        // 6. diff of a document with its round trip
+        wjson::WriteOptions pretty;
+        pretty.indent = 2;
+        const auto again = wjson::parse_document(wjson::serialize(document.document->root(), pretty), options);
+        if (!again) violated("pretty Document output does not parse");
+        if (wjson_cli::diff(document.document->root(), again.document->root(), [](const wjson_cli::DiffEntry&) {}) != 0 ||
+            !wjson_cli::deep_equals(document.document->root(), again.document->root()))
+            violated("diff reports differences between a document and its round trip");
     }
 
     // 4. C API

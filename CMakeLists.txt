@@ -68,7 +68,7 @@ wjson_set_compiler_options(wjson)
 # Command-line tool
 # ---------------------------------------------------------------------------
 if(WJSON_BUILD_CLI)
-    add_executable(wjson_cli cli/main.cpp)
+    add_executable(wjson_cli cli/main.cpp cli/diff.cpp cli/diff.hpp)
     set_target_properties(wjson_cli PROPERTIES OUTPUT_NAME wjson CXX_EXTENSIONS OFF)
     if(MSVC AND NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
         # Self-contained wjson.exe: static MSVC runtime. The library sources are

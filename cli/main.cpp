@@ -13,6 +13,7 @@
 #include <system_error>
 #include <vector>
 
+#include "diff.hpp"
 #include "wjson/wjson.hpp"
 
 #ifdef _WIN32
@@ -33,7 +34,7 @@
 
 namespace {
 
-enum ExitCode { Ok = 0, InvalidJson = 1, UsageOrIoError = 2, NotFound = 3 };
+enum ExitCode { Ok = 0, InvalidJson = 1, UsageOrIoError = 2, NotFound = 3, Different = 4 };
 
 constexpr const char* usage_text =
     "Usage: wjson <command> [options] [file...]\n"
@@ -43,19 +44,27 @@ constexpr const char* usage_text =
     "  format [--indent N] [file]    Pretty-print JSON (default indent: 2)\n"
     "  minify [file]                 Print JSON without whitespace\n"
     "  query <pointer> [file]        Print the value at a JSON Pointer, e.g. /items/0/name\n"
+    "  diff <left> <right>           Show the differences between two JSON documents\n"
     "\n"
     "Options:\n"
     "  --jsonc                       Accept comments and trailing commas (JSONC)\n"
     "  --max-depth N                 Maximum nesting depth (default: 512)\n"
     "  --ascii                       Escape non-ASCII characters as \\uXXXX\n"
     "  --raw                         query: print strings without quotes\n"
+    "  -q, --quiet                   diff: print nothing, only set the exit code\n"
     "  -h, --help                    Show this help\n"
     "  --version                     Show version\n"
     "\n"
     "Reads standard input when no file (or '-') is given. 'validate' streams\n"
     "files, so it checks files of any size with constant memory.\n"
-    "Exit codes: 0 = ok, 1 = invalid JSON, 2 = usage or I/O error,\n"
-    "            3 = query pointer not found.\n";
+    "\n"
+    "'diff' compares objects ignoring member order, aligns array elements (an\n"
+    "insertion is reported once) and compares numbers by value (1 = 1.0). Each\n"
+    "difference is one line: '+ /pointer: value' (only in <right>),\n"
+    "'- /pointer: value' (only in <left>) or '~ /pointer: old -> new'.\n"
+    "\n"
+    "Exit codes: 0 = ok (diff: equal), 1 = invalid JSON, 2 = usage or I/O error,\n"
+    "            3 = query pointer not found, 4 = diff: the documents differ.\n";
 
 #ifdef _WIN32
 std::string narrow(const wchar_t* s) {
@@ -186,6 +195,34 @@ bool parse_size(const std::string& text, std::size_t& out) {
     return true;
 }
 
+int run_diff(const std::vector<std::string>& files, const wjson::ParseOptions& options, bool ascii_only,
+             bool quiet) {
+    if (files.size() != 2) {
+        std::cerr << "wjson: diff needs two files, for example: wjson diff old.json new.json\n";
+        return UsageOrIoError;
+    }
+    if (files[0] == "-" && files[1] == "-") {
+        std::cerr << "wjson: diff can read only one of the two documents from standard input\n";
+        return UsageOrIoError;
+    }
+    int exit_code = Ok;
+    wjson::DocumentResult documents[2];
+    for (std::size_t i = 0; i < 2; ++i) {
+        const auto input = read_input(files[i], exit_code);
+        if (!input) return exit_code;
+        documents[i] = wjson::parse_document(input->text, options);
+        if (!documents[i]) {
+            report(*input, documents[i].error);
+            return InvalidJson;
+        }
+    }
+    const std::size_t count = wjson_cli::diff(
+        documents[0].document->root(), documents[1].document->root(), [&](const wjson_cli::DiffEntry& entry) {
+            if (!quiet) std::cout << wjson_cli::to_string(entry, ascii_only) << '\n';
+        });
+    return count == 0 ? Ok : Different;
+}
+
 int run(const std::vector<std::string>& args) {
     if (args.empty()) {
         std::cerr << usage_text;
@@ -200,7 +237,8 @@ int run(const std::vector<std::string>& args) {
         std::cout << "wjson " << WJSON_VERSION << '\n';
         return Ok;
     }
-    if (command != "validate" && command != "format" && command != "minify" && command != "query") {
+    if (command != "validate" && command != "format" && command != "minify" && command != "query" &&
+        command != "diff") {
         std::cerr << "wjson: unknown command '" << command << "'\n\n" << usage_text;
         return UsageOrIoError;
     }
@@ -209,6 +247,7 @@ int run(const std::vector<std::string>& args) {
     wjson::WriteOptions write_options;
     write_options.indent = command == "format" ? 2 : 0;
     bool raw_strings = false;
+    bool quiet = false;
     std::optional<std::string> pointer;
     std::vector<std::string> files;
 
@@ -221,6 +260,8 @@ int run(const std::vector<std::string>& args) {
             parse_options.allow_trailing_commas = true;
         } else if (a == "--raw" && command == "query") {
             raw_strings = true;
+        } else if ((a == "-q" || a == "--quiet") && command == "diff") {
+            quiet = true;
         } else if (a == "--indent" && command == "format") {
             std::size_t n = 0;
             if (i + 1 >= args.size() || !parse_size(args[++i], n) || n < 1 || n > 16) {
@@ -247,6 +288,7 @@ int run(const std::vector<std::string>& args) {
         std::cerr << "wjson: query needs a JSON Pointer, for example: wjson query /items/0 data.json\n";
         return UsageOrIoError;
     }
+    if (command == "diff") return run_diff(files, parse_options, write_options.ascii_only, quiet);
     if (files.empty()) files.emplace_back("-");
     if (command != "validate" && files.size() > 1) {
         std::cerr << "wjson: " << command << " accepts a single file\n";
