@@ -54,7 +54,7 @@ function Write-Diagnostics {
         ForEach-Object { Write-Host "[$($_.ProviderName)] $($_.Message)" }
 }
 
-function Test-Scenario([string] $Name, [string[]] $Arguments, [string] $ExpectedTitle) {
+function Test-Scenario([string] $Name, [string[]] $Arguments, [string] $ExpectedTitle, [double] $DelaySeconds = 4) {
     Write-Host "== $Name"
     $process = Start-Process -FilePath $Exe -ArgumentList $Arguments -PassThru
     try {
@@ -70,7 +70,7 @@ function Test-Scenario([string] $Name, [string[]] $Arguments, [string] $Expected
         }
         [Native.Win32]::ShowWindow($process.MainWindowHandle, 3) | Out-Null   # maximize
         [Native.Win32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
-        Start-Sleep -Seconds 4                                                 # validation + rendering
+        Start-Sleep -Milliseconds ([int]($DelaySeconds * 1000))                # validation + rendering
         $process.Refresh()
         if ($process.HasExited) { throw "${Name}: the viewer exited with code $($process.ExitCode)" }
         Write-Host "window: '$($process.MainWindowTitle)'"
@@ -83,8 +83,44 @@ function Test-Scenario([string] $Name, [string[]] $Arguments, [string] $Expected
     }
 }
 
+# Scripted checks inside the app (colors, typing, undo, text <-> tree): see MainWindow.SelfTest.cs.
+function Test-SelfTest([string] $File) {
+    Write-Host "== self-test"
+    $log = Join-Path $OutputDir 'self-test.txt'
+    $process = Start-Process -FilePath $Exe -ArgumentList @($File, '--lang', 'en', '--self-test', $log) -PassThru
+    $null = $process.Handle   # keeps the exit code available after the process ends
+    if (-not $process.WaitForExit(180000)) {
+        $process.Kill()
+        Write-Diagnostics
+        throw 'self-test: the viewer did not finish in 3 minutes'
+    }
+    if (Test-Path $log) { Get-Content $log | Write-Host } else { Write-Host 'no self-test log' }
+    if ($process.ExitCode -ne 0) {
+        Write-Diagnostics
+        throw "self-test: exit code $($process.ExitCode)"
+    }
+}
+
+# A file big enough to see the progress panel while it opens (about 110 MB).
+function New-LargeSample([string] $Path) {
+    $item = '{"id":1234,"nombre":"elemento de prueba","valores":[1.5,2,3],"activo":true,"extra":null},'
+    $writer = [IO.StreamWriter]::new($Path, $false, [Text.UTF8Encoding]::new($false))
+    try {
+        $writer.Write('[')
+        for ($i = 0; $i -lt 600; $i++) { $writer.Write($item * 2000) }
+        $writer.Write('{}]')
+    } finally { $writer.Dispose() }
+    Write-Host "large sample: $([Math]::Round((Get-Item $Path).Length / 1MB)) MB"
+}
+
+Test-SelfTest (Join-Path $Samples 'sample.json')
+
 Test-Scenario 'valid' @((Join-Path $Samples 'sample.json'), '--pointer', '/tiendas/2/ciudad') 'sample.json'
 Test-Scenario 'invalid' @((Join-Path $Samples 'invalid.json')) 'invalid.json'
 Test-Scenario 'spanish-jsonc' @((Join-Path $Samples 'settings.jsonc'), '--lang', 'es') 'settings.jsonc'
 Test-Scenario 'compare' @((Join-Path $Samples 'sample.json'), '--compare', (Join-Path $Samples 'sample-v2.json'), '--lang', 'es') 'sample.json'
+$large = Join-Path ([IO.Path]::GetTempPath()) 'wjson-large-sample.json'
+New-LargeSample $large
+Test-Scenario 'large-file-progress' @($large, '--lang', 'es') 'wjson-large-sample.json' 2.5
+Remove-Item $large -ErrorAction SilentlyContinue
 Write-Host 'Smoke test passed'

@@ -42,6 +42,7 @@ namespace Wjson.Viewer
 
         /// <summary>
         /// Command line: WjsonViewer.exe [file] [--pointer /json/pointer] [--compare other.json] [--lang es|en]
+        /// [--self-test log.txt] (runs scripted checks on the open file, writes the results and exits: used by CI)
         /// </summary>
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
@@ -71,7 +72,7 @@ namespace Wjson.Viewer
 
         // Event handlers that loose XAML cannot hook up; removed before probing.
         private static readonly string[] EventAttributes =
-            { "Click", "DragOver", "Drop", "TextChanged", "KeyDown", "Expanding", "ItemInvoked" };
+            { "Click", "DragOver", "Drop", "TextChanged", "SelectionChanged", "Paste", "KeyDown", "PreviewKeyDown", "Expanding", "ItemInvoked" };
 
         /// <summary>
         /// WinUI's XamlParseException does not say which element failed. Load
@@ -114,12 +115,14 @@ namespace Wjson.Viewer
             string? file = null;
             string? pointer = null;
             string? compare = null;
+            string? selfTest = null;
             var argv = Environment.GetCommandLineArgs();
             for (var i = 1; i < argv.Length; ++i)
             {
                 if (argv[i] == "--pointer" && i + 1 < argv.Length) pointer = argv[++i];
                 else if (argv[i] == "--compare" && i + 1 < argv.Length) compare = argv[++i];
                 else if (argv[i] == "--lang" && i + 1 < argv.Length) SetLanguage(argv[++i]);
+                else if (argv[i] == "--self-test" && i + 1 < argv.Length) selfTest = argv[++i];
                 else file ??= argv[i];
             }
 
@@ -127,6 +130,11 @@ namespace Wjson.Viewer
             _window.Activate();
             if (file != null) await _window.OpenFileAsync(Path.GetFullPath(file), pointer);
             if (file != null && compare != null) await _window.CompareWithAsync(Path.GetFullPath(compare));
+            if (file != null && selfTest != null)
+            {
+                var failures = await _window.RunSelfTestAsync(Path.GetFullPath(selfTest));
+                Environment.Exit(failures == 0 ? 0 : 1);
+            }
         }
     }
 }

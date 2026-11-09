@@ -1,5 +1,8 @@
 // Validation and parsing for the viewer, safe to run on a background thread.
 // SPDX-License-Identifier: MIT
+using System;
+using System.Collections;
+using System.Threading;
 using Wjson;
 
 namespace Wjson.Viewer.Core
@@ -33,6 +36,9 @@ namespace Wjson.Viewer.Core
         internal static ValidationResult Invalid(JsonParseError error) => new ValidationResult(error, 0);
     }
 
+    /// <summary>Steps of opening a large file, reported to show progress.</summary>
+    public enum AnalysisStage { Validating, Reading, BuildingTree }
+
     public static class DocumentAnalysis
     {
         public static ParseOptions Options(bool jsonc) => jsonc ? ParseOptions.Jsonc : new ParseOptions();
@@ -53,14 +59,41 @@ namespace Wjson.Viewer.Core
 
         /// <summary>
         /// Validates a file in streaming mode (constant memory) and builds the
-        /// tree only if the file is small enough.
+        /// tree only if the file is small enough. Reports each stage, and stops
+        /// with OperationCanceledException between stages (and while counting
+        /// values) when <paramref name="cancel"/> is signaled.
         /// </summary>
-        public static ValidationResult AnalyzeFile(DocumentFile file, bool jsonc)
+        public static ValidationResult AnalyzeFile(DocumentFile file, bool jsonc, Action<AnalysisStage>? progress = null,
+                                                   CancellationToken cancel = default)
         {
+            progress?.Invoke(AnalysisStage.Validating);
             if (!WJson.TryValidateFile(file.Path, out var error, Options(jsonc))) return ValidationResult.Invalid(error!);
+            cancel.ThrowIfCancellationRequested();
             if (file.Size > DocumentFile.TreeSizeLimit) return ValidationResult.Valid(null, 0);
+
+            progress?.Invoke(AnalysisStage.Reading);
             var value = WJson.ParseFile(file.Path, Options(jsonc));
-            return ValidationResult.Valid(JsonTree.CreateRoot(value), JsonTree.CountValues(value));
+            cancel.ThrowIfCancellationRequested();
+
+            progress?.Invoke(AnalysisStage.BuildingTree);
+            var count = CountValues(value, cancel);
+            return ValidationResult.Valid(JsonTree.CreateRoot(value), count);
+        }
+
+        private static long CountValues(object? value, CancellationToken cancel)
+        {
+            long count = 1;
+            if (value is JsonArray array)
+            {
+                foreach (var item in array) count += CountValues(item, cancel);
+                cancel.ThrowIfCancellationRequested();
+            }
+            else if (value is JsonObject obj)
+            {
+                foreach (DictionaryEntry entry in obj) count += CountValues(entry.Value, cancel);
+                cancel.ThrowIfCancellationRequested();
+            }
+            return count;
         }
     }
 }

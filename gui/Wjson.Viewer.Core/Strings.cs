@@ -65,6 +65,13 @@ namespace Wjson.Viewer.Core
                                      "Corrige los errores del documento actual antes de comparar."),
             ["OtherInvalid"] = ("{0} is not valid JSON: {1}", "{0} no es JSON válido: {1}"),
             ["Close"] = ("Close", "Cerrar"),
+            ["Validating"] = ("Validating {0}…", "Validando {0}…"),
+            ["Reading"] = ("Reading the values…", "Leyendo los valores…"),
+            ["BuildingTree"] = ("Building the tree…", "Construyendo el árbol…"),
+            ["Comparing"] = ("Comparing with {0}…", "Comparando con {0}…"),
+            ["Elapsed"] = ("{0:N0} s", "{0:N0} s"),
+            ["Cancelled"] = ("Cancelled", "Cancelado"),
+            ["NoHighlight"] = ("Too long to color", "Demasiado largo para colorear"),
         };
 
         private static readonly Dictionary<JsonErrorCode, string> SpanishErrors = new()

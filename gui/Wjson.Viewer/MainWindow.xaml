@@ -81,18 +81,23 @@
                 <ColumnDefinition Width="2*" MinWidth="200" />
             </Grid.ColumnDefinitions>
 
-            <TextBox
+            <!-- Syntax colors, undo/redo and the link with the tree are handled in code. -->
+            <RichEditBox
                 x:Name="Editor"
                 Grid.Column="0"
-                AcceptsReturn="True"
                 TextWrapping="NoWrap"
                 IsSpellCheckEnabled="False"
                 IsTextPredictionEnabled="False"
+                ClipboardCopyFormat="PlainText"
+                DisabledFormattingAccelerators="All"
                 FontFamily="Cascadia Mono, Consolas"
                 FontSize="13"
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                TextChanged="Editor_TextChanged" />
+                TextChanged="Editor_TextChanged"
+                SelectionChanged="Editor_SelectionChanged"
+                Paste="Editor_Paste"
+                PreviewKeyDown="Editor_PreviewKeyDown" />
 
             <Grid Grid.Column="1" RowSpacing="8">
                 <Grid.RowDefinitions>
@@ -155,6 +160,36 @@
                 </Grid>
             </Grid>
         </Grid>
+
+        <!-- Progress while opening or comparing large files -->
+        <Border
+            x:Name="BusyPanel"
+            Grid.Row="1"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            MinWidth="360"
+            Padding="24,20"
+            Visibility="Collapsed"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <StackPanel Spacing="12">
+                <TextBlock x:Name="BusyText" FontWeight="SemiBold" TextWrapping="Wrap" MaxWidth="480" />
+                <ProgressBar x:Name="BusyProgress" IsIndeterminate="True" />
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        x:Name="BusyElapsed"
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Button x:Name="BusyCancelButton" Grid.Column="1" Click="BusyCancel_Click" />
+                </Grid>
+            </StackPanel>
+        </Border>
 
         <!-- Status bar -->
         <Grid

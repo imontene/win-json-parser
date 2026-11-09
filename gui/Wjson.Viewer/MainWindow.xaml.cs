@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI;
 using Microsoft.UI.Dispatching;
@@ -69,6 +70,8 @@ namespace Wjson.Viewer
     public sealed partial class MainWindow : Window
     {
         private readonly DispatcherQueueTimer _validateTimer;
+        private readonly DispatcherQueueTimer _caretTimer;
+        private readonly DispatcherQueueTimer _busyTimer;
         private int _validationVersion;
 
         private string? _path;                 // null for a new document
@@ -80,7 +83,22 @@ namespace Wjson.Viewer
         private bool _closeConfirmed;
 
         private ValidationResult? _result;
+        private string? _resultText;           // editor text that _result describes
         private JsonTreeNode? _selected;
+
+        // Editor state (see "Editor" below).
+        private string _text = "";             // editor text, line breaks as "\r"
+        private readonly EditHistory _history = new EditHistory();
+        private List<SyntaxSpan> _spans = new List<SyntaxSpan>(); // colors currently painted
+        private bool _highlight = true;        // false while the text is above JsonSyntax.HighlightLimit
+        private bool _rtfFailed;               // RTF loading changed the text once: load plain text and paint instead
+        private bool _trailingBreak;           // the control reports one extra "\r" at the end of its text
+        private bool _applyingHistory;
+        private int _pasteLength;
+        private int _ignoreSelection;          // > 0 while the editor selection is set by code
+
+        private CancellationTokenSource? _busy;
+        private DateTime _busyStart;
 
         public MainWindow()
         {
@@ -94,6 +112,16 @@ namespace Wjson.Viewer
             _validateTimer.IsRepeating = false;
             _validateTimer.Tick += async (_, _) => await ValidateAsync();
 
+            _caretTimer = DispatcherQueue.CreateTimer();
+            _caretTimer.Interval = TimeSpan.FromMilliseconds(250);
+            _caretTimer.IsRepeating = false;
+            _caretTimer.Tick += async (_, _) => await SyncTreeToCaretAsync();
+
+            _busyTimer = DispatcherQueue.CreateTimer();
+            _busyTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _busyTimer.IsRepeating = true;
+            _busyTimer.Tick += (_, _) => UpdateBusyElapsed();
+
             try
             {
                 // The tree is read-only: no drag and drop of nodes.
@@ -106,6 +134,8 @@ namespace Wjson.Viewer
                 App.Log(e);
             }
 
+            InitializeEditor();
+            ((FrameworkElement)Content).ActualThemeChanged += (_, _) => ReloadEditorColors();
             AppWindow.Closing += AppWindow_Closing;
             ApplyStrings();
             UpdateTitle();
@@ -136,6 +166,7 @@ namespace Wjson.Viewer
             CopyPointerButton.Content = Strings.Get("CopyPointer");
             CopyValueButton.Content = Strings.Get("CopyValue");
             GoToErrorButton.Content = Strings.Get("GoToError");
+            BusyCancelButton.Content = Strings.Get("Cancel");
             Editor.PlaceholderText = Strings.Get("DropHint");
         }
 
@@ -223,7 +254,7 @@ namespace Wjson.Viewer
             if (file.IsLarge)
             {
                 _largeFile = file;
-                SetEditorText("");
+                LoadEditorText("");
                 Editor.IsReadOnly = true;
                 Editor.PlaceholderText = Strings.Format("LargeFile", Strings.Size(file.Size));
             }
@@ -232,18 +263,14 @@ namespace Wjson.Viewer
                 _largeFile = null;
                 Editor.IsReadOnly = false;
                 Editor.PlaceholderText = Strings.Get("DropHint");
-                SetEditorText(file.Text!);
+                LoadEditorText(file.Text!);
             }
+            _history.Clear();
+            _cleanText = _text;
             _dirty = false;
             UpdateTitle();
             await ValidateAsync();
             if (!string.IsNullOrEmpty(pointer)) NavigateTo(pointer!);
-        }
-
-        private void SetEditorText(string text)
-        {
-            Editor.Text = text;
-            _cleanText = Editor.Text; // read back: the TextBox stores line breaks as "\r"
         }
 
         private async Task<bool> SaveAsync(bool saveAs)
@@ -262,7 +289,7 @@ namespace Wjson.Viewer
             }
             try
             {
-                var text = Editor.Text;
+                var text = _text;
                 await Task.Run(() => DocumentFile.Save(path!, text, _encoding, _newlines));
             }
             catch (Exception e)
@@ -271,7 +298,7 @@ namespace Wjson.Viewer
                 return false;
             }
             _path = path;
-            _cleanText = Editor.Text;
+            _cleanText = _text;
             _dirty = false;
             UpdateTitle();
             return true;
@@ -357,17 +384,6 @@ namespace Wjson.Viewer
 
         private bool Jsonc => JsoncToggle.IsChecked == true;
 
-        private void Editor_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (!_dirty && Editor.Text != _cleanText)
-            {
-                _dirty = true;
-                UpdateTitle();
-            }
-            _validateTimer.Stop();
-            _validateTimer.Start();
-        }
-
         private async void Jsonc_Click(object sender, RoutedEventArgs e) => await ValidateAsync();
 
         private async Task ValidateAsync()
@@ -376,18 +392,45 @@ namespace Wjson.Viewer
             var version = ++_validationVersion;
             var jsonc = Jsonc;
             ValidationResult? result;
+            var text = _text;
             if (_largeFile != null)
             {
                 var file = _largeFile;
                 StatusText.Text = "…";
-                result = await Task.Run(() => DocumentAnalysis.AnalyzeFile(file, jsonc));
+                var cancel = BeginBusy(Strings.Format("Validating", Strings.Size(file.Size)));
+                try
+                {
+                    void Report(AnalysisStage stage) => DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (_busy?.Token != cancel) return;
+                        BusyText.Text = stage switch
+                        {
+                            AnalysisStage.Validating => Strings.Format("Validating", Strings.Size(file.Size)),
+                            AnalysisStage.Reading => Strings.Get("Reading"),
+                            _ => Strings.Get("BuildingTree"),
+                        };
+                    });
+                    // WaitAsync returns as soon as the user cancels; the background work stops at its next check.
+                    result = await Task.Run(() => DocumentAnalysis.AnalyzeFile(file, jsonc, Report, cancel)).WaitAsync(cancel);
+                }
+                catch (OperationCanceledException)
+                {
+                    if (version != _validationVersion) return;
+                    ShowResult(null);
+                    StatusText.Text = Strings.Get("Cancelled");
+                    return;
+                }
+                finally
+                {
+                    EndBusy(cancel);
+                }
             }
             else
             {
-                var text = Editor.Text;
                 result = string.IsNullOrWhiteSpace(text) ? null : await Task.Run(() => DocumentAnalysis.Analyze(text, jsonc));
             }
             if (version != _validationVersion) return; // a newer validation is running
+            _resultText = text;
             ShowResult(result);
         }
 
@@ -428,7 +471,8 @@ namespace Wjson.Viewer
             var info = new List<string>();
             if (valid && result!.ValueCount > 0) info.Add(Strings.Format("Nodes", result.ValueCount));
             else if (valid) info.Add(Strings.Get("TooLargeForTree"));
-            info.Add(_largeFile != null ? Strings.Size(_largeFile.Size) : Strings.Format("Characters", Editor.Text.Length));
+            info.Add(_largeFile != null ? Strings.Size(_largeFile.Size) : Strings.Format("Characters", _text.Length));
+            if (!_highlight) info.Add(Strings.Get("NoHighlight"));
             info.Add(EncodingName());
             info.Add(_newlines == NewlineStyle.CrLf ? "CRLF" : "LF");
             InfoText.Text = string.Join("  ·  ", info);
@@ -449,10 +493,10 @@ namespace Wjson.Viewer
         private void GoToError_Click(object sender, RoutedEventArgs e)
         {
             if (_result?.Error is not { } error || _largeFile != null) return;
-            var text = Editor.Text;
+            var text = _text;
             var index = TextPositions.IndexOf(text, error.Line, error.Column);
             Editor.Focus(FocusState.Programmatic);
-            Editor.Select(index, index < text.Length ? 1 : 0);
+            SelectInEditor(index, index < text.Length ? index + 1 : index);
         }
 
         // ------------------------------------------------------------------
@@ -483,9 +527,14 @@ namespace Wjson.Viewer
             var name = Path.GetFileName(otherPath);
             var options = DocumentAnalysis.Options(Jsonc);
             DiffResult diff;
+            var cancel = BeginBusy(Strings.Format("Comparing", name));
             try
             {
-                diff = await Task.Run(() => JsonDiff.Compare(left.Value, WJson.ParseFile(otherPath, options)));
+                diff = await Task.Run(() => JsonDiff.Compare(left.Value, WJson.ParseFile(otherPath, options))).WaitAsync(cancel);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
             }
             catch (JsonParseException ex)
             {
@@ -498,6 +547,10 @@ namespace Wjson.Viewer
             {
                 await ShowMessageAsync(Strings.Get("OpenFailed"), ex.Message);
                 return;
+            }
+            finally
+            {
+                EndBusy(cancel);
             }
             await ShowDiffAsync(diff, name);
         }
@@ -579,7 +632,8 @@ namespace Wjson.Viewer
             var options = DocumentAnalysis.Options(Jsonc);
             try
             {
-                Editor.Text = indent > 0 ? WJson.Format(Editor.Text, indent, false, options) : WJson.Minify(Editor.Text, false, options);
+                var text = indent > 0 ? WJson.Format(_text, indent, false, options) : WJson.Minify(_text, false, options);
+                ReplaceEditorText(text);
             }
             catch (JsonParseException ex)
             {
@@ -645,7 +699,11 @@ namespace Wjson.Viewer
 
         private void Tree_ItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
         {
-            if (args.InvokedItem is TreeViewNode { Content: NodeItem item }) ShowSelection(item.Node);
+            if (args.InvokedItem is TreeViewNode { Content: NodeItem item })
+            {
+                ShowSelection(item.Node);
+                SelectInEditor(item.Node.Pointer);
+            }
         }
 
         private void ShowSelection(JsonTreeNode? node)
@@ -666,8 +724,11 @@ namespace Wjson.Viewer
 
         private void Go_Click(object sender, RoutedEventArgs e) => NavigateTo(PointerBox.Text.Trim());
 
-        /// <summary>Expands the tree down to the value at a JSON Pointer and selects it.</summary>
-        private void NavigateTo(string pointer)
+        /// <summary>
+        /// Expands the tree down to the value at a JSON Pointer and selects it,
+        /// and also in the editor unless the request comes from the editor.
+        /// </summary>
+        private void NavigateTo(string pointer, bool fromEditor = false)
         {
             PointerBox.Text = pointer;
             var root = _result?.Root;
@@ -694,6 +755,7 @@ namespace Wjson.Viewer
             }
             Tree.SelectedNode = current;
             ShowSelection(path[path.Count - 1]);
+            if (!fromEditor) SelectInEditor(pointer);
 
             var target = current;
             DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
